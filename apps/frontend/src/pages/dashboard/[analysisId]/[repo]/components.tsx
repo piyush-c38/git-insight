@@ -2,11 +2,11 @@ import { useMemo } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { fetcher } from '@/lib/api';
 import ReactFlowGraph from '@/components/visualization/ReactFlowGraph';
-import { createFileTreeGraph } from '@/lib/graph-utils';
+import { fetcher } from '@/lib/api';
+import { createComponentRelationshipGraph } from '@/lib/graph-utils';
 
-export default function FilesPage() {
+export default function ComponentsPage() {
   const router = useRouter();
   const { analysisId } = router.query;
 
@@ -16,9 +16,8 @@ export default function FilesPage() {
   );
 
   const graphData = useMemo(() => {
-    if (!analysisData?.analysis?.files) return { nodes: [], edges: [] };
-    const filePaths = analysisData.analysis.files.map((f: any) => f.path);
-    return createFileTreeGraph(filePaths);
+    if (!analysisData?.analysis?.parsedData) return { nodes: [], edges: [] };
+    return createComponentRelationshipGraph(analysisData.analysis.parsedData);
   }, [analysisData]);
 
   if (analysisError) return <DashboardLayout><div>Failed to load analysis.</div></DashboardLayout>;
@@ -26,7 +25,7 @@ export default function FilesPage() {
 
   return (
     <DashboardLayout>
-      <h1 className="text-3xl font-bold text-primary mb-4">File Structure</h1>
+      <h1 className="text-3xl font-bold text-primary mb-4">Component Relationship Graph</h1>
       <div className="h-[calc(100vh-10rem)]">
         <ReactFlowGraph nodes={graphData.nodes} edges={graphData.edges} />
       </div>

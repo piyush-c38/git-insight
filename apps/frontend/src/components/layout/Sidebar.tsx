@@ -14,18 +14,25 @@ export default function Sidebar() {
   const { analysisId, repo } = router.query;
   const repoParam = typeof repo === 'string' ? repo : '';
 
-  const navigation = [
-    { name: 'Overview', href: `/dashboard/${analysisId}/${repoParam}` },
-    { name: 'File Explorer', href: `/dashboard/${analysisId}/${repoParam}/files` },
-    { name: 'Dependencies', href: `/dashboard/${analysisId}/${repoParam}/dependencies` },
-    { name: 'Code Flow', href: `/dashboard/${analysisId}/${repoParam}/flow` },
-    { name: 'Chat', href: `/dashboard/${analysisId}/${repoParam}/chat` },
-  ];
+  const basePath = analysisId && repoParam ? `/dashboard/${analysisId}/${repoParam}` : '';
+  const navigation = basePath
+    ? [
+        { name: 'Overview', href: `${basePath}` },
+        { name: 'File Explorer', href: `${basePath}/files` },
+        { name: 'Dependencies', href: `${basePath}/dependencies` },
+        { name: 'Components', href: `${basePath}/components` },
+        { name: 'Architecture', href: `${basePath}/architecture` },
+        { name: 'Code Flow', href: `${basePath}/flow` },
+        { name: 'Chat', href: `${basePath}/chat` },
+      ]
+    : [];
 
   const icons: { [key: string]: React.ElementType } = {
     Overview: HomeIcon,
     'File Explorer': FolderIcon,
     Dependencies: ShareIcon,
+    Components: CodeBracketSquareIcon,
+    Architecture: CodeBracketSquareIcon,
     'Code Flow': CodeBracketSquareIcon,
     Chat: ChatBubbleLeftRightIcon,
   };
@@ -36,6 +43,11 @@ export default function Sidebar() {
         <h1 className="text-2xl font-bold text-primary">AI Explainer</h1>
       </div>
       <nav className="space-y-2">
+        {!basePath && (
+          <div className="px-4 py-2 text-sm text-on-surface-variant">
+            Open an analysis to see navigation.
+          </div>
+        )}
         {navigation.map((item) => {
           const Icon = icons[item.name];
           return (

@@ -3,6 +3,7 @@ import mermaid from 'mermaid';
 
 export default function MermaidRenderer({ chart }: { chart: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const idRef = useRef(`mermaid-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
     if (chart && ref.current) {
@@ -16,11 +17,17 @@ export default function MermaidRenderer({ chart }: { chart: string }) {
           textColor: '#E3E3E3',
         },
       });
-      mermaid.render('mermaid-graph', chart, (svgCode) => {
-        if (ref.current) {
-          ref.current.innerHTML = svgCode;
-        }
-      });
+      mermaid
+        .render(idRef.current, chart)
+        .then(({ svg }) => {
+          if (ref.current) {
+            ref.current.innerHTML = svg;
+          }
+        })
+        .catch((error) => {
+          // eslint-disable-next-line no-console
+          console.error('Mermaid render failed:', error);
+        });
     }
   }, [chart]);
 

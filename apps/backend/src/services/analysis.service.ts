@@ -41,6 +41,7 @@ class AnalysisService {
         collectionName,
         dependencies,
         files,
+        parsedData,
       };
     } catch (error) {
       console.error('Repository analysis failed:', error);

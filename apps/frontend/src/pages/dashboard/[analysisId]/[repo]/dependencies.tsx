@@ -1,24 +1,37 @@
+import { useMemo } from 'react';
+import { useRouter } from 'next/router';
+import useSWR from 'swr';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ReactFlowGraph from '@/components/visualization/ReactFlowGraph';
-import { Node, Edge } from 'reactflow';
-
-// Mock data
-const nodes: Node[] = [
-  { id: '1', position: { x: 250, y: 5 }, data: { label: 'package.json' } },
-  { id: '2', position: { x: 100, y: 100 }, data: { label: 'index.js' } },
-  { id: '3', position: { x: 400, y: 100 }, data: { label: 'utils.js' } },
-];
-const edges: Edge[] = [
-  { id: 'e2-1', source: '2', target: '1' },
-  { id: 'e2-3', source: '2', target: '3' },
-];
+import { fetcher } from '@/lib/api';
+import { createDependencyGraph } from '@/lib/graph-utils';
 
 export default function DependenciesPage() {
+  const router = useRouter();
+  const { analysisId } = router.query;
+
+  const { data: analysisData, error: analysisError } = useSWR(
+    analysisId ? `/api/analysis/${analysisId}` : null,
+    fetcher
+  );
+
+  const graphData = useMemo(() => {
+    if (!analysisData?.analysis?.dependencies) return { nodes: [], edges: [] };
+    
+    const { dependencies, devDependencies } = analysisData.analysis.dependencies;
+    const allDependencies = { ...dependencies, ...devDependencies };
+    
+    return createDependencyGraph(allDependencies, analysisData.analysis.dependencies);
+  }, [analysisData]);
+
+  if (analysisError) return <DashboardLayout><div>Failed to load analysis.</div></DashboardLayout>;
+  if (!analysisData) return <DashboardLayout><div>Loading...</div></DashboardLayout>;
+
   return (
     <DashboardLayout>
       <h1 className="text-3xl font-bold text-primary mb-4">Dependency Graph</h1>
       <div className="h-[calc(100vh-10rem)]">
-        <ReactFlowGraph nodes={nodes} edges={edges} />
+        <ReactFlowGraph nodes={graphData.nodes} edges={graphData.edges} />
       </div>
     </DashboardLayout>
   );

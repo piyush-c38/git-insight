@@ -9,6 +9,7 @@ import traverse from '@babel/traverse';
 interface ParsedData {
   filePath: string;
   dependencies: string[];
+  exports: string[];
 }
 
 class ParserService {
@@ -39,9 +40,10 @@ class ParserService {
     return this.parser.parse(sourceCode);
   }
 
-  private extractDependenciesBabel(filePath: string): string[] {
+  private extractDependenciesBabel(filePath: string): { dependencies: string[], exports: string[] } {
     const sourceCode = fs.readFileSync(filePath, 'utf8');
     const dependencies: string[] = [];
+    const exports: string[] = [];
     const ast = babelParser.parse(sourceCode, {
       sourceType: 'module',
       plugins: ['jsx', 'typescript'],
@@ -61,9 +63,34 @@ class ParserService {
           dependencies.push(node.arguments[0].value);
         }
       },
+      ExportNamedDeclaration({ node }) {
+        if (node.specifiers) {
+          node.specifiers.forEach(spec => {
+            if (spec.type === 'ExportSpecifier') {
+              exports.push(spec.exported.type === 'Identifier' ? spec.exported.name : spec.exported.value);
+            }
+          });
+        }
+        if (node.declaration) {
+            if (node.declaration.type === 'VariableDeclaration') {
+                node.declaration.declarations.forEach(decl => {
+                    if (decl.id.type === 'Identifier') {
+                        exports.push(decl.id.name);
+                    }
+                });
+            } else if (node.declaration.type === 'FunctionDeclaration' || node.declaration.type === 'ClassDeclaration') {
+                if (node.declaration.id) {
+                    exports.push(node.declaration.id.name);
+                }
+            }
+        }
+      },
+      ExportDefaultDeclaration({ node }) {
+        exports.push('default');
+      },
     });
 
-    return dependencies;
+    return { dependencies, exports };
   }
 
   async parseFile(filePath: string): Promise<ParsedData | null> {
@@ -73,8 +100,11 @@ class ParserService {
     }
 
     let dependencies: string[] = [];
+    let exports: string[] = [];
     if (language === JavaScript) {
-      dependencies = this.extractDependenciesBabel(filePath);
+      const result = this.extractDependenciesBabel(filePath);
+      dependencies = result.dependencies;
+      exports = result.exports;
     } else {
       const tree = this.parseWithTreeSitter(filePath, language);
       // Basic dependency extraction for other languages can be added here
@@ -83,6 +113,7 @@ class ParserService {
     return {
       filePath,
       dependencies,
+      exports,
     };
   }
 }
