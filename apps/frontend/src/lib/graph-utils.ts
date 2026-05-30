@@ -1,6 +1,14 @@
 import { stratify, tree } from 'd3-hierarchy';
 import { Edge, Node } from 'reactflow';
 
+export type DependencyCategory = 'prod' | 'dev' | 'peer' | 'optional' | 'unknown';
+
+export interface DeclaredDependency {
+  name: string;
+  version: string;
+  category: DependencyCategory;
+}
+
 export interface FileTreeNode {
   id: string;
   path: string;
@@ -65,8 +73,8 @@ export const createFileTreeGraph = (filePaths: string[]) => {
   return { nodes, edges };
 };
 
-export const createDependencyGraph = (dependencies: { [key: string]: string }, packageJson: any) => {
-  const declaredDependencies = getDeclaredPackageDependencies(packageJson, dependencies);
+export const createDependencyGraph = (dependencies: Record<string, DeclaredDependency>, packageJson: any) => {
+  const declaredDependencies = dependencies;
   const nodes: Node[] = [];
   const edges: Edge[] = [];
   const centerNodeId = packageJson?.name || 'root';
@@ -83,18 +91,26 @@ export const createDependencyGraph = (dependencies: { [key: string]: string }, p
     return { nodes, edges };
   }
 
-  const angleStep = (2 * Math.PI) / depKeys.length;
-  const radius = 400;
+  const perRing = depKeys.length > 18 ? 7 : depKeys.length > 10 ? 5 : depKeys.length > 0 ? depKeys.length : 1;
+  const ringSpacing = depKeys.length > 18 ? 150 : depKeys.length > 10 ? 90 : 70;
+  const totalRings = Math.max(1, Math.ceil(depKeys.length / perRing));
 
   depKeys.forEach((dep, i) => {
-    const angle = i * angleStep;
+    const ringIndex = Math.floor(i / perRing);
+    const indexInRing = i % perRing;
+    const nodesInRing = Math.min(perRing, depKeys.length*2 - ringIndex * perRing);
+    const angleStep = (2 * Math.PI) / nodesInRing;
+    const angleOffset = ringIndex % 2 === 0 ? 0 : angleStep / 2;
+    const radius = ringSpacing * (ringIndex + 1);
+    const angle = indexInRing * angleStep + angleOffset;
     const x = radius * Math.cos(angle);
     const y = radius * Math.sin(angle);
+    const dependency = declaredDependencies[dep];
 
     nodes.push({
       id: dep,
       position: { x, y },
-      data: { label: `${dep}@${declaredDependencies[dep]}`, type: 'dependency' },
+      data: { label: `${dep}@${dependency.version}`, type: 'dependency' },
       type: 'custom',
     });
 
@@ -109,24 +125,42 @@ export const createDependencyGraph = (dependencies: { [key: string]: string }, p
   return { nodes, edges };
 };
 
-export const getDeclaredPackageDependencies = (packageJson: any, fallbackDependencies: { [key: string]: string } = {}) => {
-  const declaredSections = [
-    packageJson?.dependencies,
-    packageJson?.devDependencies,
-    packageJson?.peerDependencies,
-    packageJson?.optionalDependencies,
+export const getDeclaredPackageDependencies = (
+  packageJson: any,
+  fallbackDependencies: Record<string, string> = {}
+) => {
+  const sections: Array<{ category: DependencyCategory; value: unknown }> = [
+    { category: 'prod', value: packageJson?.dependencies },
+    { category: 'dev', value: packageJson?.devDependencies },
+    { category: 'peer', value: packageJson?.peerDependencies },
+    { category: 'optional', value: packageJson?.optionalDependencies },
   ];
 
-  const fromPackageJson = declaredSections.reduce((acc, section) => {
-    if (!section || typeof section !== 'object') return acc;
-    return { ...acc, ...section };
-  }, {} as Record<string, string>);
+  const fromPackageJson = sections.reduce((acc, section) => {
+    if (!section.value || typeof section.value !== 'object') return acc;
+
+    return Object.entries(section.value as Record<string, string>).reduce((next, [name, version]) => {
+      next[name] = {
+        name,
+        version,
+        category: section.category,
+      };
+      return next;
+    }, acc);
+  }, {} as Record<string, DeclaredDependency>);
 
   if (Object.keys(fromPackageJson).length > 0) {
     return fromPackageJson;
   }
 
-  return fallbackDependencies;
+  return Object.entries(fallbackDependencies).reduce((acc, [name, version]) => {
+    acc[name] = {
+      name,
+      version,
+      category: 'unknown',
+    };
+    return acc;
+  }, {} as Record<string, DeclaredDependency>);
 };
 
 export const createComponentRelationshipGraph = (parsedData: any[]) => {

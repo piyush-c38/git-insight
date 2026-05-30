@@ -5,7 +5,7 @@ import useSWR from 'swr';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { PageHeader, PageShell } from '@/components/page-header';
 import { fetcher } from '@/lib/api';
-import { getDeclaredPackageDependencies } from '@/lib/graph-utils';
+import { getDeclaredPackageDependencies, type DeclaredDependency } from '@/lib/graph-utils';
 import { Boxes, FileCode2, GitFork, Star } from 'lucide-react';
 
 function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | number }) {
@@ -40,7 +40,23 @@ export default function DashboardPage() {
       data?.dependencies as Record<string, string>
     );
 
-    return Object.keys(declaredDependencies).slice(0, 12);
+    return Object.values(declaredDependencies).slice(0, 12);
+  }, [data?.dependencies, data?.packageJson]);
+
+  const dependencyCounts = useMemo(() => {
+    const declaredDependencies = getDeclaredPackageDependencies(
+      data?.packageJson,
+      data?.dependencies as Record<string, string>
+    );
+
+    return Object.values(declaredDependencies).reduce(
+      (acc, dependency) => {
+        if (dependency.category === 'dev') acc.dev += 1;
+        else acc.prod += 1;
+        return acc;
+      },
+      { prod: 0, dev: 0 }
+    );
   }, [data?.dependencies, data?.packageJson]);
 
   const onboardingFiles = useMemo(() => {
@@ -121,9 +137,9 @@ export default function DashboardPage() {
               {dependenciesList.length === 0 ? (
                 <span className="text-sm text-muted-foreground">No package.json dependencies detected.</span>
               ) : (
-                dependenciesList.map((dep) => (
-                  <span key={dep} className="rounded-full bg-secondary px-3 py-1 text-xs text-secondary-foreground">
-                    {dep}
+                dependenciesList.map((dep: DeclaredDependency) => (
+                  <span key={dep.name} className="rounded-full bg-secondary px-3 py-1 text-xs text-secondary-foreground">
+                    {dep.name} {dep.version}
                   </span>
                 ))
               )}

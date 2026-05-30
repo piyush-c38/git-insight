@@ -5,7 +5,11 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { PageHeader, PageShell } from '@/components/page-header';
 import { GraphCanvas, nodeStyle, nodeStylePrimary } from '@/components/graph-canvas';
 import { fetcher } from '@/lib/api';
-import { createDependencyGraph, getDeclaredPackageDependencies } from '@/lib/graph-utils';
+import {
+  createDependencyGraph,
+  getDeclaredPackageDependencies,
+  type DeclaredDependency,
+} from '@/lib/graph-utils';
 import type { Edge, Node } from 'reactflow';
 
 export default function DependenciesPage() {
@@ -32,14 +36,14 @@ export default function DependenciesPage() {
       analysisData.packageJson
     );
 
-    const deps = Object.keys(declaredDependencies);
+    const deps = Object.values(declaredDependencies);
     const nodes = graphNodes.map((node, index) => ({
       ...node,
       style: index === 0 ? nodeStylePrimary : nodeStyle,
     }));
 
     return { nodes, edges: graphEdges, list: deps };
-  }, [analysisData]);
+  }, [analysisData]) as { nodes: Node[]; edges: Edge[]; list: DeclaredDependency[] };
 
   if (analysisError) return <DashboardLayout><PageShell>Failed to load analysis.</PageShell></DashboardLayout>;
   if (!analysisData) return <DashboardLayout><PageShell>Loading...</PageShell></DashboardLayout>;
@@ -62,14 +66,14 @@ export default function DependenciesPage() {
               No dependencies detected.
             </div>
           ) : (
-            list.map((dep) => (
-              <div key={dep} className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
+            list.map((dep: DeclaredDependency) => (
+              <div key={dep.name} className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
                 <div>
-                  <div className="text-sm font-medium">{dep}</div>
-                  <div className="text-xs text-muted-foreground">import</div>
+                  <div className="text-sm font-medium">{dep.name}</div>
+                  <div className="text-xs text-muted-foreground">{dep.version}</div>
                 </div>
                 <span className="rounded-full bg-secondary px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  dependency
+                  {dep.category}
                 </span>
               </div>
             ))
