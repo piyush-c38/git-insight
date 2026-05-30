@@ -12,6 +12,7 @@ import {
   GitFork,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAnalysis } from '@/lib/api';
 
 type SidebarItem = {
   id: string;
@@ -51,6 +52,11 @@ export default function AppSidebar() {
   const resolvedRepo = repoParam || pathMatch?.[2] || '';
   const basePath = resolvedAnalysisId && resolvedRepo ? `/dashboard/${resolvedAnalysisId}/${resolvedRepo}` : '';
 
+  const { analysis } = useAnalysis(resolvedAnalysisId);
+  const isProcessing = analysis?.status === 'processing';
+  const isHomeActive = router.asPath === '/';
+  const homeLabel = isHomeActive ? 'Home' : 'New analysis';
+
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
       <div className="border-b border-sidebar-border px-5 py-5">
@@ -83,6 +89,20 @@ export default function AppSidebar() {
                     : '';
                 const active = href && router.asPath === href;
                 const Icon = item.icon;
+                const displayLabel = item.id === 'home' ? homeLabel : item.label;
+
+                // If analysis is processing, disable all sidebar tabs (render non-interactive)
+                if (isProcessing) {
+                  return (
+                    <li key={item.id}>
+                      <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-muted-foreground/60 opacity-60">
+                        <Icon className="size-4" />
+                        <span>{displayLabel}</span>
+                      </div>
+                    </li>
+                  );
+                }
+
                 return (
                   <li key={item.id}>
                     {href ? (
@@ -96,7 +116,7 @@ export default function AppSidebar() {
                         )}
                       >
                         <Icon className="size-4" />
-                        <span>{item.label}</span>
+                        <span>{displayLabel}</span>
                         {active && (
                           <span className="ml-auto size-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--color-primary)]" />
                         )}
@@ -104,7 +124,7 @@ export default function AppSidebar() {
                     ) : (
                       <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-muted-foreground/60">
                         <Icon className="size-4" />
-                        <span>{item.label}</span>
+                        <span>{displayLabel}</span>
                       </div>
                     )}
                   </li>
@@ -117,9 +137,9 @@ export default function AppSidebar() {
 
       <div className="border-t border-sidebar-border p-3">
         <div className="rounded-xl border border-sidebar-border bg-sidebar-accent/50 p-3">
-          <div className="text-xs font-medium">MVP build</div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground">
-            Mock data — wire your RAG API in <code className="text-primary">src/lib/api</code>.
+          <div className="text-xs font-medium">Project MVP</div>
+          <div className="mt-1 text-[11px] text-muted-foreground">
+            Hey! This is a MVP version of GitExplainer. Feedbacks are appreciated.
           </div>
         </div>
       </div>
