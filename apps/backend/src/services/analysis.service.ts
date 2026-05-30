@@ -1,4 +1,6 @@
 import { randomUUID } from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import { githubService } from './github.service';
 import { parserService } from './parser.service';
 import { embeddingService } from './embedding.service';
@@ -13,10 +15,32 @@ interface AnalysisRecord {
   status: AnalysisStatus;
   message?: string;
   collectionName?: string;
+  repoMetadata?: {
+    stars: number;
+    forks: number;
+    techStack: string[];
+  };
+  packageJson?: Record<string, unknown>;
   dependencies?: Record<string, unknown>;
   files?: string[];
   parsedData?: unknown[];
   error?: string;
+}
+
+function readPackageJson(localPath: string): Record<string, unknown> | undefined {
+  const packageJsonPath = path.join(localPath, 'package.json');
+
+  if (!fs.existsSync(packageJsonPath)) {
+    return undefined;
+  }
+
+  try {
+    const raw = fs.readFileSync(packageJsonPath, 'utf8');
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch (error) {
+    console.warn('Failed to read package.json from analyzed repository:', error);
+    return undefined;
+  }
 }
 
 class AnalysisService {
@@ -68,6 +92,8 @@ class AnalysisService {
     try {
       const localPath = await githubService.cloneRepo(repoUrl);
       const files = await githubService.scanFiles(localPath);
+      const repoMetadata = await githubService.fetchRepoMetadata(repoUrl);
+      const packageJson = readPackageJson(localPath);
       const collectionName = repoUrl.replace(/[^a-zA-Z0-9]/g, '_');
 
       const parsedData = [];
@@ -98,6 +124,8 @@ class AnalysisService {
       return {
         message: 'Analysis complete',
         collectionName,
+        repoMetadata,
+        packageJson,
         dependencies,
         files,
         parsedData,

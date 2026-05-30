@@ -5,8 +5,13 @@ import useSWR from 'swr';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { PageHeader, PageShell } from '@/components/page-header';
 import { fetcher } from '@/lib/api';
-import { getDeclaredPackageDependencies, type DeclaredDependency } from '@/lib/graph-utils';
+import { getDeclaredPackageDependencies } from '@/lib/graph-utils';
 import { Boxes, FileCode2, GitFork, Star } from 'lucide-react';
+
+function formatCount(value?: number) {
+  if (typeof value !== 'number') return '--';
+  return new Intl.NumberFormat('en', { notation: 'compact' }).format(value);
+}
 
 function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | number }) {
   return (
@@ -34,30 +39,21 @@ export default function DashboardPage() {
     return data.repoUrl.replace('https://github.com/', '');
   }, [data?.repoUrl]);
 
-  const dependenciesList = useMemo(() => {
+  const dependencyDetails = useMemo(() => {
     const declaredDependencies = getDeclaredPackageDependencies(
       data?.packageJson,
       data?.dependencies as Record<string, string>
     );
 
-    return Object.values(declaredDependencies).slice(0, 12);
+    return Object.values(declaredDependencies);
   }, [data?.dependencies, data?.packageJson]);
 
-  const dependencyCounts = useMemo(() => {
-    const declaredDependencies = getDeclaredPackageDependencies(
-      data?.packageJson,
-      data?.dependencies as Record<string, string>
-    );
+  const dependencyCount = dependencyDetails.length;
 
-    return Object.values(declaredDependencies).reduce(
-      (acc, dependency) => {
-        if (dependency.category === 'dev') acc.dev += 1;
-        else acc.prod += 1;
-        return acc;
-      },
-      { prod: 0, dev: 0 }
-    );
-  }, [data?.dependencies, data?.packageJson]);
+  const techStack = useMemo(() => {
+    if (!Array.isArray(data?.repoMetadata?.techStack)) return [] as string[];
+    return data.repoMetadata.techStack.slice(0, 12);
+  }, [data?.repoMetadata?.techStack]);
 
   const onboardingFiles = useMemo(() => {
     if (!data?.files) return [] as string[];
@@ -102,10 +98,10 @@ export default function DashboardPage() {
         />
 
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-          <Stat icon={Star} label="Stars" value="--" />
-          <Stat icon={GitFork} label="Forks" value="--" />
+          <Stat icon={Star} label="Stars" value={formatCount(data.repoMetadata?.stars)} />
+          <Stat icon={GitFork} label="Forks" value={formatCount(data.repoMetadata?.forks)} />
           <Stat icon={FileCode2} label="Files indexed" value={data.files.length} />
-          <Stat icon={Boxes} label="Dependencies" value={dependenciesList.length} />
+          <Stat icon={Boxes} label="Dependencies" value={dependencyCount} />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -134,12 +130,12 @@ export default function DashboardPage() {
           <div className="rounded-2xl border border-border bg-card p-6">
             <h2 className="mb-4 font-semibold">Tech stack</h2>
             <div className="flex flex-wrap gap-2">
-              {dependenciesList.length === 0 ? (
-                <span className="text-sm text-muted-foreground">No package.json dependencies detected.</span>
+              {techStack.length === 0 ? (
+                <span className="text-sm text-muted-foreground">No tech stack metadata found on GitHub.</span>
               ) : (
-                dependenciesList.map((dep: DeclaredDependency) => (
-                  <span key={dep.name} className="rounded-full bg-secondary px-3 py-1 text-xs text-secondary-foreground">
-                    {dep.name} {dep.version}
+                techStack.map((stack: string) => (
+                  <span key={stack} className="rounded-full bg-secondary px-3 py-1 text-xs text-secondary-foreground">
+                    {stack}
                   </span>
                 ))
               )}

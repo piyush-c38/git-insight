@@ -4,6 +4,12 @@ import path from 'path';
 import config from '../config';
 import { ApiError } from '../lib/errors';
 
+interface RepoMetadata {
+  stars: number;
+  forks: number;
+  techStack: string[];
+}
+
 class GitHubService {
   private git: SimpleGit;
 
@@ -50,6 +56,64 @@ class GitHubService {
 
     walk(localPath);
     return allFiles;
+  }
+
+  private extractOwnerRepo(repoUrl: string) {
+    const cleanedUrl = repoUrl.replace(/\.git$/, '');
+    const match = cleanedUrl.match(/github\.com[:/]([^/]+)\/([^/]+)$/i);
+
+    if (!match) {
+      throw new ApiError(400, 'Invalid GitHub repository URL');
+    }
+
+    return {
+      owner: match[1],
+      repo: match[2],
+    };
+  }
+
+  async fetchRepoMetadata(repoUrl: string): Promise<RepoMetadata | undefined> {
+    try {
+      const { owner, repo } = this.extractOwnerRepo(repoUrl);
+      const headers: Record<string, string> = {
+        Accept: 'application/vnd.github+json',
+      };
+
+      if (config.githubToken) {
+        headers.Authorization = `Bearer ${config.githubToken}`;
+      }
+
+      const repoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
+      if (!repoResponse.ok) {
+        console.warn(`Failed to fetch repository metadata for ${repoUrl}: ${repoResponse.status}`);
+        return undefined;
+      }
+
+      const repoData = await repoResponse.json();
+
+      const languagesResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/languages`, { headers });
+      const languagesData = languagesResponse.ok
+        ? ((await languagesResponse.json()) as Record<string, number>)
+        : {};
+
+      const sortedLanguages = Object.entries(languagesData)
+        .sort((a, b) => b[1] - a[1])
+        .map(([name]) => name)
+        .slice(0, 5);
+
+      const topics = Array.isArray(repoData.topics) ? (repoData.topics as string[]) : [];
+      const primaryLanguage = typeof repoData.language === 'string' ? [repoData.language] : [];
+      const techStack = Array.from(new Set([...primaryLanguage, ...sortedLanguages, ...topics])).slice(0, 12);
+
+      return {
+        stars: Number(repoData.stargazers_count || 0),
+        forks: Number(repoData.forks_count || 0),
+        techStack,
+      };
+    } catch (error) {
+      console.warn('Unable to fetch GitHub metadata:', error);
+      return undefined;
+    }
   }
 }
 
