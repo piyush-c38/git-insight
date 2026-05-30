@@ -6,40 +6,8 @@ import useSWR from 'swr';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { PageHeader, PageShell } from '@/components/page-header';
 import { fetcher } from '@/lib/api';
+import { buildTree, normalizeFilePaths, type RepoFile } from '@/lib/file-tree';
 import { ChevronRight, FileText, Folder, FolderOpen, Star } from 'lucide-react';
-
-type RepoFile = {
-  path: string;
-  name: string;
-  type: 'file' | 'folder';
-  important?: boolean;
-  children?: RepoFile[];
-};
-
-const buildTree = (paths: string[]): RepoFile => {
-  const root: RepoFile = { path: '', name: '', type: 'folder', children: [] };
-  paths.forEach((fullPath) => {
-    const parts = fullPath.split('/').filter(Boolean);
-    let current = root;
-    parts.forEach((part, index) => {
-      const isFile = index === parts.length - 1;
-      const nextPath = current.path ? `${current.path}/${part}` : part;
-      let child = current.children?.find((node) => node.name === part);
-      if (!child) {
-        child = {
-          path: nextPath,
-          name: part,
-          type: isFile ? 'file' : 'folder',
-          important: /readme|package\.json|tsconfig|tailwind|vite|next\.config|app\//i.test(nextPath),
-          children: isFile ? undefined : [],
-        };
-        current.children?.push(child);
-      }
-      current = child;
-    });
-  });
-  return root;
-};
 
 function Tree({ node, depth = 0, onSelect, selected }: { node: RepoFile; depth?: number; onSelect: (f: RepoFile) => void; selected: string }) {
   const [open, setOpen] = useState(depth < 1);
@@ -129,17 +97,7 @@ export default function FilesPage() {
 
   const tree = useMemo(() => {
     if (!analysisData?.files) return null;
-    const prefix = analysisData.files.reduce((acc: string, current: string) => {
-      if (!acc) return current;
-      let i = 0;
-      while (i < acc.length && i < current.length && acc[i] === current[i]) i += 1;
-      return acc.slice(0, i);
-    }, '');
-
-    const normalized = analysisData.files.map((pathValue: string) =>
-      pathValue.replace(prefix, '').replace(/^\//, '')
-    );
-
+    const normalized = normalizeFilePaths(analysisData.files);
     return buildTree(normalized);
   }, [analysisData]);
 
