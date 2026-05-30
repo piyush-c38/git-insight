@@ -1,12 +1,19 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.vectorService = void 0;
 const chromadb_1 = require("chromadb");
 const errors_1 = require("../lib/errors");
+const config_1 = __importDefault(require("../config"));
 class VectorService {
     constructor() {
         this.collection = null;
-        this.client = new chromadb_1.ChromaClient();
+        if (!config_1.default.chromaUrl) {
+            throw new errors_1.ApiError(500, 'CHROMA_URL is not configured');
+        }
+        this.client = new chromadb_1.ChromaClient({ path: config_1.default.chromaUrl });
     }
     async getOrCreateCollection(name) {
         try {
@@ -24,11 +31,13 @@ class VectorService {
         }
         const ids = documents.map(doc => doc.id);
         const embeddings = documents.map(doc => doc.embedding);
+        const texts = documents.map(doc => doc.document);
         const metadatas = documents.map(doc => doc.metadata);
         try {
             await this.collection.add({
                 ids,
                 embeddings,
+                documents: texts,
                 metadatas,
             });
         }

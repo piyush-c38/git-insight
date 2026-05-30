@@ -81,10 +81,29 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<RepoOnboardingSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [analysisProgress, setAnalysisProgress] = useState(12);
 
   const { data, error } = useSWR(analysisId ? `/api/analysis/${analysisId}` : null, fetcher, {
     refreshInterval: 5000,
   });
+
+  useEffect(() => {
+    if (!data || data.status !== 'processing') {
+      setAnalysisProgress(100);
+      return;
+    }
+
+    setAnalysisProgress(12);
+    const timer = window.setInterval(() => {
+      setAnalysisProgress((current) => {
+        if (current >= 94) return current;
+        const next = current + (current < 35 ? 9 : current < 70 ? 4 : 1);
+        return Math.min(next, 94);
+      });
+    }, 700);
+
+    return () => window.clearInterval(timer);
+  }, [data?.status]);
 
   const repoName = useMemo(() => {
     if (!data?.repoUrl) return 'Repository';
@@ -189,7 +208,21 @@ export default function DashboardPage() {
   if (error) return <DashboardLayout><PageShell>Failed to load analysis.</PageShell></DashboardLayout>;
   if (!data) return <DashboardLayout><PageShell>Loading analysis...</PageShell></DashboardLayout>;
   if (data.status !== 'completed') {
-    return <DashboardLayout><PageShell>Analysis in progress: {data.status}</PageShell></DashboardLayout>;
+    return (
+      <DashboardLayout>
+        <PageShell>
+          <div className="absolute top-[40%] left-[50%] w-full -translate-[35%] mx-auto flex max-w-2xl flex-col items-center gap-4 py-16 text-center">
+            <div className="text-sm text-muted-foreground">Analysis in progress: {data.status}</div>
+            <div className="w-full overflow-hidden rounded-full bg-secondary/60">
+              <div
+                className="h-2 rounded-full bg-primary transition-all duration-300 ease-out"
+                style={{ width: `${analysisProgress}%` }}
+              />
+            </div>
+          </div>
+        </PageShell>
+      </DashboardLayout>
+    );
   }
   if (!data.repoUrl || !data.files) {
     return <DashboardLayout><PageShell>Analysis data is incomplete.</PageShell></DashboardLayout>;

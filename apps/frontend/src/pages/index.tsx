@@ -54,7 +54,7 @@ export default function Home() {
         </div>
       </div>
 
-      <section className="mx-auto max-w-7xl px-5 pb-24 md:px-8">
+      <section className="mx-auto max-w-7xl px-5 pb-2 md:px-8">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature) => {
             const Icon = feature.icon;
@@ -71,10 +71,6 @@ export default function Home() {
               </div>
             );
           })}
-        </div>
-
-        <div className="mt-12 text-center text-sm text-muted-foreground">
-          Paste a repo URL above to begin.
         </div>
       </section>
     </div>

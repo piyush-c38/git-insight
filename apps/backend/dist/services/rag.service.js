@@ -20,7 +20,8 @@ class RagService {
         try {
             const queryEmbedding = await embedding_service_1.embeddingService.generateEmbeddings(query);
             const contextResults = await vector_service_1.vectorService.query(collectionName, queryEmbedding);
-            const context = contextResults.metadatas[0]?.map((meta) => meta.content).join('\n\n');
+            const contextDocuments = contextResults.documents?.[0] || [];
+            const context = contextDocuments.join('\n\n');
             const prompt = `
         Context:
         ${context}
@@ -31,7 +32,7 @@ class RagService {
       `;
             const completion = await this.groq.chat.completions.create({
                 messages: [{ role: 'user', content: prompt }],
-                model: 'llama3-8b-8192',
+                model: config_1.default.groqModel,
             });
             return completion.choices[0]?.message?.content || "Sorry, I couldn't find an answer.";
         }

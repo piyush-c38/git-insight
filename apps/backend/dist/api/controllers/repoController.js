@@ -1,8 +1,15 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startAnalysis = startAnalysis;
 exports.getAnalysis = getAnalysis;
 exports.chatWithRepo = chatWithRepo;
+exports.getFile = getFile;
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+const config_1 = __importDefault(require("../../config"));
 const analysis_service_1 = require("../../services/analysis.service");
 const rag_service_1 = require("../../services/rag.service");
 async function startAnalysis(req, res) {
@@ -50,5 +57,30 @@ async function chatWithRepo(req, res) {
     catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error during chat' });
+    }
+}
+async function getFile(req, res) {
+    const { analysisId } = req.params;
+    const { path: filePath } = req.query;
+    if (!filePath || typeof filePath !== 'string') {
+        return res.status(400).json({ message: 'File path query parameter is required' });
+    }
+    const analysis = analysis_service_1.analysisService.getAnalysisResult(analysisId);
+    if (!analysis)
+        return res.status(404).json({ message: 'Analysis not found' });
+    try {
+        const repoUrl = analysis.repoUrl;
+        const repoName = repoUrl.split('/').pop()?.replace('.git', '') || repoUrl;
+        const localPath = path_1.default.join(config_1.default.clonePath, repoName);
+        const absolutePath = path_1.default.join(localPath, filePath);
+        if (!fs_1.default.existsSync(absolutePath)) {
+            return res.status(404).json({ message: 'File not found in cloned repository' });
+        }
+        const content = fs_1.default.readFileSync(absolutePath, 'utf8');
+        res.json({ filePath, content });
+    }
+    catch (error) {
+        console.error('Error reading file from cloned repo:', error);
+        res.status(500).json({ message: 'Failed to read file' });
     }
 }

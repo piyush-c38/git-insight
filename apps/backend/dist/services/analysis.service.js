@@ -1,12 +1,31 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.analysisService = void 0;
 const crypto_1 = require("crypto");
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
 const github_service_1 = require("./github.service");
 const parser_service_1 = require("./parser.service");
 const embedding_service_1 = require("./embedding.service");
 const vector_service_1 = require("./vector.service");
 const errors_1 = require("../lib/errors");
+function readPackageJson(localPath) {
+    const packageJsonPath = path_1.default.join(localPath, 'package.json');
+    if (!fs_1.default.existsSync(packageJsonPath)) {
+        return undefined;
+    }
+    try {
+        const raw = fs_1.default.readFileSync(packageJsonPath, 'utf8');
+        return JSON.parse(raw);
+    }
+    catch (error) {
+        console.warn('Failed to read package.json from analyzed repository:', error);
+        return undefined;
+    }
+}
 class AnalysisService {
     constructor() {
         this.analyses = new Map();
@@ -53,6 +72,8 @@ class AnalysisService {
         try {
             const localPath = await github_service_1.githubService.cloneRepo(repoUrl);
             const files = await github_service_1.githubService.scanFiles(localPath);
+            const repoMetadata = await github_service_1.githubService.fetchRepoMetadata(repoUrl);
+            const packageJson = readPackageJson(localPath);
             const collectionName = repoUrl.replace(/[^a-zA-Z0-9]/g, '_');
             const parsedData = [];
             for (const file of files) {
@@ -65,9 +86,9 @@ class AnalysisService {
             const documents = embeddings.map((emb, index) => ({
                 id: `${emb.filePath}-${index}`,
                 embedding: emb.embedding,
+                document: emb.content,
                 metadata: {
                     filePath: emb.filePath,
-                    content: emb.content,
                 },
             }));
             await vector_service_1.vectorService.addDocuments(collectionName, documents);
@@ -77,6 +98,8 @@ class AnalysisService {
             return {
                 message: 'Analysis complete',
                 collectionName,
+                repoMetadata,
+                packageJson,
                 dependencies,
                 files,
                 parsedData,

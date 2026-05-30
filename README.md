@@ -1,106 +1,69 @@
-# AI GitHub Repository Explainer
+# AI GitHub Explainer
 
-[![Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FYOUR_GITHUB%2Fai-github-explainer)
+AI GitHub Explainer is a tool that analyzes a GitHub repository and explains how it works in a simple way. It shows the file structure, important dependencies, and key parts of the codebase. You can also ask questions about the repo using AI.
 
-An intelligent tool that analyzes GitHub repositories, providing in-depth explanations, visualizations, and a conversational AI to help you understand complex codebases.
+## Project Title and Description
 
-This project is a monorepo built with Turborepo, Next.js, Node.js, and a powerful AI stack.
+**Project name:** AI GitHub Explainer
 
-## ✨ Features
+This project helps you understand a code repository without reading every file by hand. It scans the repo, highlights the important parts, and gives you a clear dashboard to explore it.
 
-*   **Comprehensive Code Analysis**: Clones any public GitHub repository and performs a deep analysis of its structure, dependencies, and components.
-*   **Interactive Visualizations**:
-    *   **File & Folder Structure**: View the repository's layout as a tree.
-    *   **Dependency Graph**: Understand how packages and modules are interconnected.
-    *   **Component Hierarchy**: See how UI components are composed and related.
-    *   **Data Flow Diagram**: Trace data movement through the application.
-*   **Conversational AI (RAG)**: Ask questions about the repository in plain English. The AI uses a Retrieval-Augmented Generation pipeline with a vector database (ChromaDB) and the Groq API for fast, context-aware answers.
-*   **Monorepo Architecture**: Organized as a clean, scalable monorepo using Turborepo.
-    *   `apps/frontend`: A Next.js application for the user interface.
-    *   `apps/backend`: A Node.js (Express) server for the core analysis logic.
-    *   `packages/`: For shared code, configs, and types.
+## Tech Stacks Used
 
-## 🚀 Tech Stack
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- Express
+- Turborepo
+- React Flow
+- Mermaid
+- Groq AI
+- ChromaDB
 
-*   **Framework**: Next.js (with Turbopack)
-*   **Backend**: Node.js, Express
-*   **Monorepo**: Turborepo
-*   **Styling**: Tailwind CSS
-*   **UI**: Headless UI, Heroicons
-*   **Visualizations**: React Flow, D3.js, Mermaid.js
-*   **AI**:
-    *   **LLM**: Groq API
-    *   **Embeddings & Vector DB**: ChromaDB
-    *   **Code Parsing**: `tree-sitter`
-*   **Deployment**:
-    *   **Frontend**: Vercel
-    *   **Backend**: Render / Railway
+## How to Setup
 
-## 🏛️ Architecture
+1. Clone the repository.
 
-The application is split into two main parts: a frontend Next.js app and a backend Node.js service.
+```bash
+git clone https://github.com/YOUR_GITHUB/ai-github-explainer.git
+cd ai-github-explainer
+```
 
-1.  **Frontend (`apps/frontend`)**:
-    *   The user provides a GitHub repository URL.
-    *   The frontend sends a request to its own API proxy (`/api/start-analysis`).
-    *   This proxy forwards the request to the backend to start the analysis, receiving a unique `analysisId`.
-    *   The UI then polls a status endpoint (`/api/analysis/[analysisId]`) to get progress updates and, finally, the complete analysis data.
-    *   Data is visualized using React Flow for graphs and D3 for tree structures.
+2. Install the dependencies.
 
-2.  **Backend (`apps/backend`)**:
-    *   Receives a repository URL, clones it, and begins the analysis process.
-    *   Uses `tree-sitter` and other parsers to walk through the code, identifying files, dependencies, and component relationships.
-    *   Generates embeddings for the code and stores them in ChromaDB.
-    *   Provides API endpoints to serve the analysis results and handle chat queries via the RAG pipeline.
+```bash
+npm install
+```
 
-## 📦 Getting Started
+3. Add the required environment variables for the backend.
 
-### Prerequisites
+```bash
+# apps/backend/src/.env
+GROQ_API_KEY=your_groq_api_key
+GITHUB_TOKEN=your_github_token
+```
 
-*   Node.js (v20.x or higher)
-*   npm (v10.x or higher)
-*   Git
-*   `build-essential` (or equivalent for your OS) for `tree-sitter`:
-    ```bash
-    # On Debian/Ubuntu
-    sudo apt-get install -y build-essential
-    ```
+4. Start the app.
 
-### Local Development Setup
+```bash
+npm run dev
+```
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/YOUR_GITHUB/ai-github-explainer.git
-    cd ai-github-explainer
-    ```
+The frontend runs on `http://localhost:3000` and the backend runs on `http://localhost:3001`.
 
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
+## Folder Structure
 
-3.  **Set up environment variables:**
+- `apps/frontend` - The web app that shows the dashboard and UI.
+- `apps/backend` - The API server that analyzes repositories.
+- `packages` - Shared code, types, and config.
 
-    *   **Backend**: Create a `.env` file in `apps/backend/src/`.
-        ```bash
-        # apps/backend/src/.env
-        GROQ_API_KEY=gsk_...
-        ```
-        You can get a Groq API key from [GroqCloud](https://console.groq.com/keys).
+## Features
 
-    *   **Frontend**: The frontend uses Next.js API routes as a proxy to the backend. The backend URL is configured within the API routes themselves (e.g., `pages/api/analysis/[analysisId].ts`) and defaults to `http://localhost:3001`.
-
-4.  **Run the development servers:**
-    This command uses Turborepo to start both the frontend and backend servers concurrently.
-    ```bash
-    npm run dev
-    ```
-
-    *   Frontend will be available at `http://localhost:3000`.
-    *   Backend will be available at `http://localhost:3001`.
-
-5. **Command to run docker:**
-    `docker run -p 8000:8000 chromadb/chroma`
-
----
-> This README was generated by AI.
+- Analyze a GitHub repository from a URL.
+- Show the repository file explorer.
+- Show dependency graphs and other visual views.
+- Display file contents in a readable code view.
+- Show repository stats like stars, forks, and tech stack.
+- Ask AI questions about the repository.
+- Show a simple onboarding view with the entry file and other important files.

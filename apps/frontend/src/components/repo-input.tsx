@@ -12,12 +12,14 @@ interface Props {
 export default function RepoInput({ className, autoFocus }: Props) {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+    let timer: number | undefined;
 
     const trimmed = url.trim();
     if (!/^https?:\/\/(www\.)?github\.com\/[^/]+\/[^/]+/.test(trimmed)) {
@@ -27,6 +29,15 @@ export default function RepoInput({ className, autoFocus }: Props) {
 
     try {
       setLoading(true);
+      setProgress(8);
+      timer = window.setInterval(() => {
+        setProgress((current) => {
+          if (current >= 92) return current;
+          const next = current + (current < 30 ? 8 : current < 60 ? 4 : 2);
+          return Math.min(next, 92);
+        });
+      }, 500);
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -41,17 +52,21 @@ export default function RepoInput({ className, autoFocus }: Props) {
       const repoPath = trimmed.replace('https://github.com/', '');
       const encodedRepo = encodeRepoPath(repoPath);
       await router.push(`/dashboard/${data.analysisId}/${encodedRepo}`);
+
+      setProgress(100);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong.';
       setError(message);
     } finally {
+      if (timer) window.clearInterval(timer);
       setLoading(false);
+      window.setTimeout(() => setProgress(0), 600);
     }
   };
 
   return (
     <form onSubmit={submit} className={cn('w-full', className)}>
-      <div className="group relative rounded-2xl p-[1px] transition-all" style={{ background: 'var(--gradient-primary)' }}>
+      <div className="group relative rounded-2xl p-px transition-all" style={{ background: 'var(--gradient-primary)' }}>
         <div className="flex items-center gap-2 rounded-2xl bg-card px-4 py-3">
           <Sparkles className="size-5 shrink-0 text-primary" />
           <input
@@ -70,6 +85,12 @@ export default function RepoInput({ className, autoFocus }: Props) {
             <span className="hidden sm:inline">{loading ? 'Analyzing' : 'Explain'}</span>
           </button>
         </div>
+      </div>
+      <div className="mt-3 h-1 overflow-hidden rounded-full bg-secondary/60">
+        <div
+          className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
+          style={{ width: `${progress}%`, opacity: loading || progress > 0 ? 1 : 0 }}
+        />
       </div>
       {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
       <p className="mt-2 text-xs text-muted-foreground">Tip: leave empty to try the demo repo.</p>

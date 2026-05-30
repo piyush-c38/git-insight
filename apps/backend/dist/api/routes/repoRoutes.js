@@ -40,5 +40,6 @@ const router = (0, express_1.Router)();
 router.get('/health', (req, res) => res.status(200).send('OK'));
 router.post('/analyze', RepoController.startAnalysis);
 router.get('/:analysisId', RepoController.getAnalysis);
+router.get('/:analysisId/file', RepoController.getFile);
 router.post('/:analysisId/chat', RepoController.chatWithRepo);
 exports.default = router;
