@@ -2,9 +2,6 @@
 node_modules/
 .pnpm-store/
 
-# Temproary ignore
-lovable-ui/
-
 # Build outputs
 dist/
 /build/
