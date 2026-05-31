@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { getBackendUrl } from '@/lib/backend-url';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { analysisId, path } = req.query;
@@ -8,7 +9,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const backendResponse = await fetch(`http://localhost:3001/api/repo/${analysisId}/file?path=${path}`);
+    const backendUrl = getBackendUrl();
+    const backendResponse = await fetch(`${backendUrl}/api/repo/${analysisId}/file?path=${path}`);
 
     if (!backendResponse.ok) {
       const errorData = await backendResponse.json();

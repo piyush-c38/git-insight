@@ -4,6 +4,7 @@ import path from 'path';
 import config from '../../config';
 import { analysisService } from '../../services/analysis.service';
 import { ragService } from '../../services/rag.service';
+import { getRepoCloneName } from '../../services/github.service';
 
 export async function startAnalysis(req: Request, res: Response) {
   const { repoUrl } = req.body;
@@ -74,7 +75,7 @@ export async function getFile(req: Request, res: Response) {
 
   try {
     const repoUrl = analysis.repoUrl;
-    const repoName = repoUrl.split('/').pop()?.replace('.git', '') || repoUrl;
+    const repoName = getRepoCloneName(repoUrl);
     const localPath = path.join(config.clonePath!, repoName);
     const absolutePath = path.join(localPath, filePath);
 

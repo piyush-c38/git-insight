@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { getBackendUrl } from '@/lib/backend-url';
 
 // This API route proxies requests to the backend to start an analysis.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -12,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:3001';
+    const backendUrl = getBackendUrl();
     const backendResponse = await fetch(`${backendUrl}/api/repo/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

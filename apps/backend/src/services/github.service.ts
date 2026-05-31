@@ -10,6 +10,17 @@ interface RepoMetadata {
   techStack: string[];
 }
 
+export function getRepoCloneName(repoUrl: string) {
+  const cleanedUrl = repoUrl.replace(/\.git$/, '');
+  const match = cleanedUrl.match(/github\.com[:/]([^/]+)\/([^/]+)$/i);
+
+  if (!match) {
+    return repoUrl.split('/').pop()?.replace('.git', '') || 'repo';
+  }
+
+  return `${match[1]}_${match[2]}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
 class GitHubService {
   private git: SimpleGit;
 
@@ -18,7 +29,7 @@ class GitHubService {
   }
 
   async cloneRepo(repoUrl: string): Promise<string> {
-    const repoName = repoUrl.split('/').pop()?.replace('.git', '') || 'repo';
+    const repoName = getRepoCloneName(repoUrl);
     const localPath = path.join(config.clonePath!, repoName);
 
     if (fs.existsSync(localPath)) {

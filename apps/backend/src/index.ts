@@ -8,6 +8,20 @@ const port = config.port;
 
 app.use(express.json());
 
+app.use((req, res, next) => {
+  const origin = config.corsOrigin || req.headers.origin || '*';
+
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
 app.use('/api', apiRoutes);
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
@@ -19,5 +33,5 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 });
 
 app.listen(port, () => {
-  console.log(`[server]: Server is running at http://localhost:${port}`);
+  console.log(`[server]: Server is running on port ${port}`);
 });

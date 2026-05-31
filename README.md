@@ -50,7 +50,7 @@ GITHUB_TOKEN=your_github_token
 npm run dev
 ```
 
-The frontend runs on `http://localhost:3000` and the backend runs on `http://localhost:3001`.
+In local development, the frontend and backend run on the ports configured in your environment.
 
 ## Folder Structure
 

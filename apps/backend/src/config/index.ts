@@ -9,6 +9,7 @@ const config = {
   githubToken: process.env.GITHUB_TOKEN,
   chromaUrl: process.env.CHROMA_URL,
   clonePath: process.env.CLONE_PATH || '/tmp/ai-github-explainer-clones',
+  corsOrigin: process.env.CORS_ORIGIN || process.env.FRONTEND_URL,
   port: process.env.PORT || 3001,
 };
 
