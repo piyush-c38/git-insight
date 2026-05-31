@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -14,12 +14,64 @@ export default function RepoInput({ className, autoFocus }: Props) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [analysisId, setAnalysisId] = useState<string | null>(null);
+  const [targetRepoPath, setTargetRepoPath] = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    if (!analysisId || !targetRepoPath) return;
+
+    let cancelled = false;
+
+    const progressTimer = window.setInterval(() => {
+      setProgress((current) => {
+        if (current >= 95) return current;
+        const next = current + (current < 35 ? 4 : current < 70 ? 2 : 1);
+        return Math.min(next, 95);
+      });
+    }, 700);
+
+    const pollTimer = window.setInterval(async () => {
+      try {
+        const response = await fetch(`/api/analysis/${analysisId}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (cancelled) return;
+
+        if (data.status === 'completed') {
+          window.clearInterval(progressTimer);
+          window.clearInterval(pollTimer);
+          setProgress(100);
+          setLoading(false);
+          await router.push(`/dashboard/${analysisId}/${targetRepoPath}`);
+          return;
+        }
+
+        if (data.status === 'failed') {
+          window.clearInterval(progressTimer);
+          window.clearInterval(pollTimer);
+          setError('Analysis failed. Please try again.');
+          setLoading(false);
+          setAnalysisId(null);
+          setTargetRepoPath(null);
+          setProgress(0);
+        }
+      } catch {
+        // Keep polling; transient network errors should not cancel analysis flow.
+      }
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(progressTimer);
+      window.clearInterval(pollTimer);
+    };
+  }, [analysisId, targetRepoPath, router]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
-    let timer: number | undefined;
 
     const trimmed = url.trim();
     if (!/^https?:\/\/(www\.)?github\.com\/[^/]+\/[^/]+/.test(trimmed)) {
@@ -30,13 +82,6 @@ export default function RepoInput({ className, autoFocus }: Props) {
     try {
       setLoading(true);
       setProgress(8);
-      timer = window.setInterval(() => {
-        setProgress((current) => {
-          if (current >= 92) return current;
-          const next = current + (current < 30 ? 8 : current < 60 ? 4 : 2);
-          return Math.min(next, 92);
-        });
-      }, 500);
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -51,16 +96,16 @@ export default function RepoInput({ className, autoFocus }: Props) {
       const data = await response.json();
       const repoPath = trimmed.replace('https://github.com/', '');
       const encodedRepo = encodeRepoPath(repoPath);
-      await router.push(`/dashboard/${data.analysisId}/${encodedRepo}`);
 
-      setProgress(100);
+      setTargetRepoPath(encodedRepo);
+      setAnalysisId(data.analysisId);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong.';
       setError(message);
-    } finally {
-      if (timer) window.clearInterval(timer);
       setLoading(false);
-      window.setTimeout(() => setProgress(0), 600);
+      setProgress(0);
+    } finally {
+      // Loading is finalized by polling flow.
     }
   };
 
