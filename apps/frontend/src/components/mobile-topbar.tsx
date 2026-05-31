@@ -8,7 +8,7 @@ export default function MobileTopbar({ dashboardHref }: { dashboardHref?: string
         <div className="grid size-8 place-items-center rounded-lg" style={{ background: 'var(--gradient-primary)' }}>
           <GitFork className="size-4 text-primary-foreground" />
         </div>
-        <span className="text-sm font-semibold">RepoLens</span>
+        <span className="text-sm font-semibold">GitInsight</span>
       </Link>
       {dashboardHref ? (
         <Link href={dashboardHref} className="text-xs text-muted-foreground hover:text-foreground">

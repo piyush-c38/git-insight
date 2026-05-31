@@ -53,7 +53,7 @@ export default function RepoInput({ className, autoFocus }: Props) {
         const next = current + (current < 35 ? 4 : current < 70 ? 2 : 1);
         return Math.min(next, 95);
       });
-    }, 700);
+    }, 2000); 
 
     pollTimerRef.current = window.setInterval(async () => {
       try {
