@@ -3,11 +3,11 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Boxes, GitBranch, MessagesSquare, Network, Sparkles, Workflow } from 'lucide-react';
 
 const features = [
-  { icon: GitBranch, title: 'Architecture overview', body: 'High-level system map of the repo.' },
+  // { icon: GitBranch, title: 'Architecture overview', body: 'High-level system map of the repo.' },
   { icon: Boxes, title: 'Dependency graph', body: "What's installed, and who uses what." },
-  { icon: Network, title: 'Component relationships', body: 'See how files import each other.' },
-  { icon: Workflow, title: 'Data and request flow', body: 'Trace a request from UI to DB.' },
-  { icon: Sparkles, title: 'Onboarding path', body: 'The 5 files a new contributor should read.' },
+  // { icon: Network, title: 'Component relationships', body: 'See how files import each other.' },
+  // { icon: Workflow, title: 'Data and request flow', body: 'Trace a request from UI to DB.' },
+  { icon: Sparkles, title: 'Onboarding path', body: 'The important notes a new contributor should read.' },
   { icon: MessagesSquare, title: 'Chat with the repo', body: 'Ask anything in plain English.' },
 ];
 
@@ -26,7 +26,7 @@ export default function Home() {
       <div className="relative mx-auto max-w-5xl px-5 pb-16 pt-16 text-center md:px-8 md:pt-28">
         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur">
           <span className="size-1.5 animate-pulse rounded-full bg-primary" />
-          AI GitHub Repository Explainer · MVP
+          AI GitHub Repository Explainer
         </div>
         <h1 className="mt-6 text-4xl font-semibold tracking-tight md:text-6xl">
           Understand any GitHub repo
@@ -36,8 +36,10 @@ export default function Home() {
           </span>
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground md:text-lg">
-          Paste a repo URL. Get an architecture map, dependency graph, important files, code flow,
+           Paste a repo URL. Get a dependency graph, important files, code flow,
           and a chat that knows the codebase.
+          {/* Paste a repo URL. Get an architecture map, dependency graph, important files, code flow,
+          and a chat that knows the codebase. */}
         </p>
 
         <div className="mx-auto mt-10 max-w-2xl">

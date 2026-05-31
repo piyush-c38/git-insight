@@ -57,6 +57,12 @@ export default function AppSidebar() {
   const isHomeActive = router.asPath === '/';
   const homeLabel = isHomeActive ? 'Home' : 'New analysis';
 
+  function handleContact() {
+    if (typeof window === 'undefined') return;
+    // Open default mail client with a prefilled recipient
+    window.location.href = 'mailto:piyushch.ofc@gmail.com';
+  }
+
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
       <div className="border-b border-sidebar-border px-5 py-5">
@@ -90,9 +96,10 @@ export default function AppSidebar() {
                 const active = href && router.asPath === href;
                 const Icon = item.icon;
                 const displayLabel = item.id === 'home' ? homeLabel : item.label;
+                const isHomeItem = item.id === 'home';
 
-                // If analysis is processing, disable all sidebar tabs (render non-interactive)
-                if (isProcessing) {
+                // While analysis is processing, keep only the new-analysis entry clickable.
+                if (isProcessing && !isHomeItem) {
                   return (
                     <li key={item.id}>
                       <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-muted-foreground/60 opacity-60">
@@ -140,6 +147,16 @@ export default function AppSidebar() {
           <div className="text-xs font-medium">Project MVP</div>
           <div className="mt-1 text-[11px] text-muted-foreground">
             Hey! This is a MVP version of GitExplainer. Feedbacks are appreciated.
+            <div className='place-items-end'>
+              <div
+                className="mt-2 grid size-10 place-items-center rounded-xl border border-border bg-card cursor-pointer"
+                onClick={handleContact}
+                role="button"
+                aria-label="Contact via email"
+              >
+                <MessagesSquare className="size-5" />
+              </div>
+            </div>
           </div>
         </div>
       </div>

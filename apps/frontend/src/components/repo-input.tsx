@@ -73,7 +73,7 @@ export default function RepoInput({ className, autoFocus }: Props) {
             autoFocus={autoFocus}
             value={url}
             onChange={(event) => setUrl(event.target.value)}
-            placeholder="Paste a GitHub repo URL — e.g. github.com/vercel/next-commerce"
+            placeholder="Paste a GitHub repo URL — e.g. https://github.com/vercel/next-commerce"
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground md:text-base"
           />
           <button
@@ -93,7 +93,6 @@ export default function RepoInput({ className, autoFocus }: Props) {
         />
       </div>
       {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
-      <p className="mt-2 text-xs text-muted-foreground">Tip: leave empty to try the demo repo.</p>
     </form>
   );
 }
