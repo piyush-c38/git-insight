@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { encodeRepoPath } from '@/lib/routes';
 
@@ -18,10 +18,22 @@ export default function RepoInput({ className, autoFocus }: Props) {
   const [targetRepoPath, setTargetRepoPath] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    if (!analysisId || !targetRepoPath) return;
+  const stopAnalysis = () => {
+    setUrl('');
+    setError(null);
+    setLoading(false);
+    setAnalysisId(null);
+    setTargetRepoPath(null);
+    setProgress(0);
+  };
 
+  useEffect(() => {
     let cancelled = false;
+    if (!analysisId || !targetRepoPath) {
+      cancelled = true;
+      return;
+    }
+
 
     const progressTimer = window.setInterval(() => {
       setProgress((current) => {
@@ -60,7 +72,7 @@ export default function RepoInput({ className, autoFocus }: Props) {
       } catch {
         // Keep polling; transient network errors should not cancel analysis flow.
       }
-    }, 2000);
+    }, 5000);
 
     return () => {
       cancelled = true;
@@ -71,6 +83,7 @@ export default function RepoInput({ className, autoFocus }: Props) {
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (loading) return;
     setError(null);
 
     const trimmed = url.trim();
@@ -109,6 +122,15 @@ export default function RepoInput({ className, autoFocus }: Props) {
     }
   };
 
+  const handlePrimaryAction = () => {
+    if (loading) {
+      stopAnalysis();
+      return;
+    }
+
+    void submit({ preventDefault: () => undefined } as React.FormEvent);
+  };
+
   return (
     <form onSubmit={submit} className={cn('w-full', className)}>
       <div className="group relative rounded-2xl p-px transition-all" style={{ background: 'var(--gradient-primary)' }}>
@@ -122,12 +144,15 @@ export default function RepoInput({ className, autoFocus }: Props) {
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground md:text-base"
           />
           <button
-            type="submit"
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+            type="button"
+            onClick={handlePrimaryAction}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90',
+              loading ? 'bg-destructive' : 'bg-primary'
+            )}
           >
-            {loading ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
-            <span className="hidden sm:inline">{loading ? 'Analyzing' : 'Explain'}</span>
+            {loading ? <Square className="size-4" /> : <ArrowRight className="size-4" />}
+            <span className="hidden sm:inline">{loading ? 'Stop' : 'Explain'}</span>
           </button>
         </div>
       </div>
