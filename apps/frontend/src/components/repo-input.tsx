@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { ArrowRight, Sparkles, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,8 +17,20 @@ export default function RepoInput({ className, autoFocus }: Props) {
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [targetRepoPath, setTargetRepoPath] = useState<string | null>(null);
   const router = useRouter();
+  const progressTimerRef = useRef<number | null>(null);
+  const pollTimerRef = useRef<number | null>(null);
 
   const stopAnalysis = () => {
+    if (progressTimerRef.current) {
+      window.clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+
+    if (pollTimerRef.current) {
+      window.clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+
     setUrl('');
     setError(null);
     setLoading(false);
@@ -35,7 +47,7 @@ export default function RepoInput({ className, autoFocus }: Props) {
     }
 
 
-    const progressTimer = window.setInterval(() => {
+    progressTimerRef.current = window.setInterval(() => {
       setProgress((current) => {
         if (current >= 95) return current;
         const next = current + (current < 35 ? 4 : current < 70 ? 2 : 1);
@@ -43,7 +55,7 @@ export default function RepoInput({ className, autoFocus }: Props) {
       });
     }, 700);
 
-    const pollTimer = window.setInterval(async () => {
+    pollTimerRef.current = window.setInterval(async () => {
       try {
         const response = await fetch(`/api/analysis/${analysisId}`);
         if (!response.ok) return;
@@ -52,8 +64,16 @@ export default function RepoInput({ className, autoFocus }: Props) {
         if (cancelled) return;
 
         if (data.status === 'completed') {
-          window.clearInterval(progressTimer);
-          window.clearInterval(pollTimer);
+          if (progressTimerRef.current) {
+            window.clearInterval(progressTimerRef.current);
+            progressTimerRef.current = null;
+          }
+
+          if (pollTimerRef.current) {
+            window.clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
+
           setProgress(100);
           setLoading(false);
           await router.push(`/dashboard/${analysisId}/${targetRepoPath}`);
@@ -61,8 +81,16 @@ export default function RepoInput({ className, autoFocus }: Props) {
         }
 
         if (data.status === 'failed') {
-          window.clearInterval(progressTimer);
-          window.clearInterval(pollTimer);
+          if (progressTimerRef.current) {
+            window.clearInterval(progressTimerRef.current);
+            progressTimerRef.current = null;
+          }
+
+          if (pollTimerRef.current) {
+            window.clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
+
           setError('Analysis failed. Please try again.');
           setLoading(false);
           setAnalysisId(null);
@@ -76,8 +104,15 @@ export default function RepoInput({ className, autoFocus }: Props) {
 
     return () => {
       cancelled = true;
-      window.clearInterval(progressTimer);
-      window.clearInterval(pollTimer);
+      if (progressTimerRef.current) {
+        window.clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+      }
+
+      if (pollTimerRef.current) {
+        window.clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
     };
   }, [analysisId, targetRepoPath, router]);
 
