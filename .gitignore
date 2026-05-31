@@ -6,7 +6,7 @@ node_modules/
 lovable-ui/
 
 # Build outputs
-/dist/
+dist/
 /build/
 .next/
 .turbo/
