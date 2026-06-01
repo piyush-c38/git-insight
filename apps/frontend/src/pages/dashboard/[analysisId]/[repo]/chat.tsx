@@ -86,7 +86,7 @@ function buildSampleQuestions(data?: AnalysisData): string[] {
       ? `Where is ${topDependency} used and why was it chosen?`
       : 'Which dependencies are most important and where are they used?',
     hasBuildScript
-      ? 'What runs during build time vs runtime in this repo?'
+      ? 'Which files are involved in the build process and how does it work?'
       : hasTestScript
         ? 'How is testing set up and where are the main tests?'
         : firstFile
@@ -118,7 +118,7 @@ export default function ChatPage() {
     setMessages([
       {
         role: 'assistant',
-        content: `Hi! I've indexed ${repoName}. Ask me about architecture, files, dependencies, or how a feature flows through the codebase.`,
+        content: `Hi! I indexed ${repoName}. Ask about architecture, tech stack, features, or how a flow works. I will cite sources from files and links.`,
       },
     ]);
   }, [analysisIdParam, data?.repoUrl, messages.length]);
@@ -169,7 +169,7 @@ export default function ChatPage() {
                     </div>
                   )}
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                    className={`max-w-[80%] rounded-2xl wrap-break-word px-4 py-2.5 text-sm leading-relaxed ${
                       msg.role === 'user'
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-secondary text-secondary-foreground'

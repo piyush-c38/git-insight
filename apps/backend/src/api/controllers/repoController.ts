@@ -54,7 +54,12 @@ export async function chatWithRepo(req: Request, res: Response) {
   }
 
   try {
-    const reply = await ragService.getRagResponse(message, analysis.collectionName);
+    const reply = await ragService.getRagResponse(message, analysis.collectionName, {
+      repoUrl: analysis.repoUrl,
+      repoMetadata: analysis.repoMetadata,
+      packageJson: analysis.packageJson,
+      files: analysis.files,
+    });
     res.json({ reply });
   } catch (error) {
     console.error(error);

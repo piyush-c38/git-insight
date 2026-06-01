@@ -43,6 +43,10 @@ function readPackageJson(localPath: string): Record<string, unknown> | undefined
   }
 }
 
+function toRelativePath(root: string, filePath: string): string {
+  return path.relative(root, filePath).split(path.sep).join('/');
+}
+
 class AnalysisService {
   private analyses = new Map<string, AnalysisRecord>();
 
@@ -92,6 +96,7 @@ class AnalysisService {
     try {
       const localPath = await githubService.cloneRepo(repoUrl);
       const files = await githubService.scanFiles(localPath);
+      const relativeFiles = files.map((filePath) => toRelativePath(localPath, filePath));
       const repoMetadata = await githubService.fetchRepoMetadata(repoUrl);
       const packageJson = readPackageJson(localPath);
       const collectionName = repoUrl.replace(/[^a-zA-Z0-9]/g, '_');
@@ -111,7 +116,7 @@ class AnalysisService {
         embedding: emb.embedding,
         document: emb.content,
         metadata: {
-          filePath: emb.filePath,
+          filePath: toRelativePath(localPath, emb.filePath),
         },
       }));
 
@@ -127,7 +132,7 @@ class AnalysisService {
         repoMetadata,
         packageJson,
         dependencies,
-        files,
+        files: relativeFiles,
         parsedData,
       };
     } catch (error) {

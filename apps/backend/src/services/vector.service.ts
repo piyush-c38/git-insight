@@ -58,6 +58,7 @@ class VectorService {
       const results = await this.collection.query({
         queryEmbeddings: [queryEmbedding],
         nResults,
+        include: ['documents', 'metadatas', 'distances'] as any,
       });
       return results;
     } catch (error) {
