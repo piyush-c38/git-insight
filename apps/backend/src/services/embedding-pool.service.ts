@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { Worker } from 'worker_threads';
 import { yieldToEventLoop } from '../lib/async-utils';
+import { logEmbeddingThroughput } from '../lib/embedding-perf';
 import { logProcessMemory } from '../lib/memory';
 import type { CodeChunk } from './chunk.service';
 
@@ -30,7 +31,8 @@ type WorkerSlot = {
 
 /** Default 1 worker to stay within Render 512MB (each worker loads its own ONNX model). */
 const WORKER_COUNT = Math.max(1, Math.min(4, Number(process.env.EMBEDDING_WORKERS) || 1));
-const BATCH_SIZE = Math.max(1, Number(process.env.EMBEDDING_BATCH_SIZE) || 8);
+/** Texts per worker message (each triggers one batched ONNX forward pass). */
+const BATCH_SIZE = Math.max(1, Number(process.env.EMBEDDING_BATCH_SIZE) || 32);
 
 function resolveWorkerScript(): { scriptPath: string; execArgv?: string[] } {
   const compiledPath = path.join(__dirname, '../workers/embedding.worker.js');
@@ -161,6 +163,10 @@ class EmbeddingPoolService {
       batches.push(chunks.slice(index, index + BATCH_SIZE));
     }
 
+    console.log(
+      `[perf] Embedding pipeline: ${chunks.length} chunks, ${batches.length} worker batch(es), batch size ${BATCH_SIZE}, ${WORKER_COUNT} worker(s)`
+    );
+
     let chunksProcessed = 0;
     const batchQueue = [...batches];
 
@@ -191,11 +197,19 @@ class EmbeddingPoolService {
     };
 
     await Promise.all(Array.from({ length: WORKER_COUNT }, () => runWorker()));
+
+    const totalMs = performance.now() - startMs;
     console.timeEnd('Embedding Generation');
     logProcessMemory('embedding pool after embedChunks');
     console.log(
-      `[perf] Embedding generation produced ${records.length} embeddings in ${(performance.now() - startMs).toFixed(3)}ms`
+      `[perf] Embedding generation produced ${records.length} embeddings in ${totalMs.toFixed(3)}ms`
     );
+    logEmbeddingThroughput({
+      label: 'total',
+      count: records.length,
+      durationMs: totalMs,
+      batchSize: BATCH_SIZE,
+    });
 
     return records;
   }
