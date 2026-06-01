@@ -21,11 +21,20 @@ export interface ClassifiedDependency {
   source: string;
 }
 
+export interface PackageDependencyGroup {
+  manifestPath: string;
+  packageName?: string;
+  dependenciesCount: number;
+  devDependenciesCount: number;
+  dependencies: ClassifiedDependency[];
+}
+
 export interface DependencySummary {
   generatedAt: string;
   manifestFiles: string[];
   totalDependencies: number;
   byCategory: Record<DependencyCategory, ClassifiedDependency[]>;
+  byPackage?: Record<string, PackageDependencyGroup>;
   highlights: string[];
   summary: string;
 }

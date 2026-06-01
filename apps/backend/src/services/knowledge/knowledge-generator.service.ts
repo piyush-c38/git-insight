@@ -23,7 +23,7 @@ class KnowledgeGeneratorService {
         : row.filePath,
     }));
 
-    const dependencySummary = dependencyAnalyzerService.analyze(input.repoRoot);
+    const dependencySummary = dependencyAnalyzerService.analyze(input.repoRoot, input.relativeFiles);
     const techStack = techStackService.analyze(
       input.relativeFiles,
       dependencySummary,

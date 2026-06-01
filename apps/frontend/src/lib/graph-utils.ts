@@ -131,6 +131,13 @@ export type DependencySummaryPayload = {
     string,
     Array<{ name: string; version: string; category: string; explanation?: string; source?: string }>
   >;
+  byPackage?: Record<
+    string,
+    {
+      manifestPath: string;
+      dependencies: Array<{ name: string; version: string; category: string; source?: string }>;
+    }
+  >;
 };
 
 const DISPLAY_CATEGORY_MAP: Record<string, string> = {
@@ -138,23 +145,48 @@ const DISPLAY_CATEGORY_MAP: Record<string, string> = {
   Other: 'Utilities',
 };
 
+function addClassifiedDep(
+  result: Record<string, DeclaredDependency>,
+  dep: { name: string; version: string; category: string; source?: string },
+  fallbackCategory?: string
+) {
+  const displayCategory = DISPLAY_CATEGORY_MAP[dep.category] ?? dep.category ?? fallbackCategory;
+  const scope =
+    dep.source?.includes('#devDependencies') || dep.source?.includes('devDependencies') ? 'dev' : 'prod';
+  result[dep.name] = {
+    name: dep.name,
+    version: dep.version,
+    category: (scope === 'dev' ? 'dev' : 'prod') as DependencyCategory,
+    semanticCategory: displayCategory,
+  };
+}
+
 export function packageDepsFromKnowledge(
   summary?: DependencySummaryPayload | null
 ): Record<string, DeclaredDependency> {
-  if (!summary?.byCategory) return {};
+  if (!summary) return {};
 
   const result: Record<string, DeclaredDependency> = {};
+
+  if (summary.byPackage) {
+    for (const pkg of Object.values(summary.byPackage)) {
+      if (!pkg?.dependencies?.length) continue;
+      for (const dep of pkg.dependencies) {
+        addClassifiedDep(result, dep);
+      }
+    }
+  }
+
+  if (Object.keys(result).length > 0) {
+    return result;
+  }
+
+  if (!summary.byCategory) return {};
+
   for (const [category, deps] of Object.entries(summary.byCategory)) {
     if (!Array.isArray(deps)) continue;
     for (const dep of deps) {
-      const displayCategory = DISPLAY_CATEGORY_MAP[dep.category] ?? dep.category ?? category;
-      const scope = dep.source?.includes('devDependencies') ? 'dev' : 'prod';
-      result[dep.name] = {
-        name: dep.name,
-        version: dep.version,
-        category: (scope === 'dev' ? 'dev' : 'prod') as DependencyCategory,
-        semanticCategory: displayCategory,
-      };
+      addClassifiedDep(result, dep, category);
     }
   }
   return result;
