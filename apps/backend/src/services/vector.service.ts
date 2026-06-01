@@ -1,22 +1,41 @@
 import { ChromaClient, Collection } from 'chromadb';
 import { ApiError } from '../lib/errors';
+import { LocalVectorStore } from '../lib/local-vector-store';
 import config from '../config';
 import { yieldToEventLoop } from '../lib/async-utils';
 
 const CHROMA_INSERT_BATCH = 100;
 
+type VectorDocument = {
+  id: string;
+  embedding: number[];
+  document: string;
+  metadata: Record<string, unknown>;
+};
+
 class VectorService {
-  private client: ChromaClient;
+  private mode: 'local' | 'remote';
+  private client: ChromaClient | null = null;
+  private localStore: LocalVectorStore | null = null;
   private collection: Collection | null = null;
 
   constructor() {
-    if (!config.chromaUrl) {
-      throw new ApiError(500, 'CHROMA_URL is not configured');
+    if (config.chromaUrl) {
+      this.mode = 'remote';
+      this.client = new ChromaClient({ path: config.chromaUrl });
+      console.log(`[chroma] Remote Chroma client: ${config.chromaUrl}`);
+    } else {
+      this.mode = 'local';
+      this.localStore = new LocalVectorStore(config.chromaDataPath);
+      console.log('[chroma] Embedded local mode (persistent disk storage, no CHROMA_URL required)');
     }
-    this.client = new ChromaClient({ path: config.chromaUrl });
   }
 
-  async getOrCreateCollection(name: string): Promise<Collection> {
+  private async getOrCreateRemoteCollection(name: string): Promise<Collection> {
+    if (!this.client) {
+      throw new ApiError(500, 'Chroma client is not configured');
+    }
+
     console.time('Chroma Collection Creation');
     try {
       this.collection = await this.client.getOrCreateCollection({ name });
@@ -29,12 +48,41 @@ class VectorService {
     }
   }
 
-  async addDocuments(
-    collectionName: string,
-    documents: { id: string; embedding: number[]; document: string; metadata: any }[]
-  ) {
+  async addDocuments(collectionName: string, documents: VectorDocument[]) {
+    if (this.mode === 'local') {
+      return this.addDocumentsLocal(collectionName, documents);
+    }
+    return this.addDocumentsRemote(collectionName, documents);
+  }
+
+  private addDocumentsLocal(collectionName: string, documents: VectorDocument[]) {
+    if (!this.localStore) {
+      throw new ApiError(500, 'Local vector store is not initialized');
+    }
+
+    console.time('Chroma Vector Insertion');
+    try {
+      this.localStore.addRecords(
+        collectionName,
+        documents.map((doc) => ({
+          id: doc.id,
+          embedding: doc.embedding,
+          document: doc.document,
+          metadata: doc.metadata,
+        }))
+      );
+      console.timeEnd('Chroma Vector Insertion');
+      console.log(`[perf] Inserted ${documents.length} vectors into local collection "${collectionName}"`);
+    } catch (error) {
+      console.timeEnd('Chroma Vector Insertion');
+      console.error('Failed to add documents to local vector store:', error);
+      throw new ApiError(500, 'Failed to add documents to vector store');
+    }
+  }
+
+  private async addDocumentsRemote(collectionName: string, documents: VectorDocument[]) {
     if (!this.collection || this.collection.name !== collectionName) {
-      this.collection = await this.getOrCreateCollection(collectionName);
+      this.collection = await this.getOrCreateRemoteCollection(collectionName);
     }
 
     console.time('Chroma Vector Insertion');
@@ -46,7 +94,7 @@ class VectorService {
           ids: batch.map((doc) => doc.id),
           embeddings: batch.map((doc) => doc.embedding),
           documents: batch.map((doc) => doc.document),
-          metadatas: batch.map((doc) => doc.metadata),
+          metadatas: batch.map((doc) => doc.metadata) as any,
         });
         inserted += batch.length;
         await yieldToEventLoop();
@@ -61,8 +109,34 @@ class VectorService {
   }
 
   async query(collectionName: string, queryEmbedding: number[], nResults = 5) {
+    if (this.mode === 'local') {
+      return this.queryLocal(collectionName, queryEmbedding, nResults);
+    }
+    return this.queryRemote(collectionName, queryEmbedding, nResults);
+  }
+
+  private queryLocal(collectionName: string, queryEmbedding: number[], nResults: number) {
+    if (!this.localStore) {
+      throw new ApiError(500, 'Local vector store is not initialized');
+    }
+
+    console.time('Chroma Query');
+    try {
+      const results = this.localStore.query(collectionName, queryEmbedding, nResults);
+      console.timeEnd('Chroma Query');
+      const hitCount = Array.isArray(results.documents?.[0]) ? results.documents[0].length : 0;
+      console.log(`[perf] Local vector query returned ${hitCount} results from collection "${collectionName}"`);
+      return results;
+    } catch (error) {
+      console.timeEnd('Chroma Query');
+      console.error('Failed to query local vector store:', error);
+      throw new ApiError(500, 'Failed to query vector store');
+    }
+  }
+
+  private async queryRemote(collectionName: string, queryEmbedding: number[], nResults: number) {
     if (!this.collection || this.collection.name !== collectionName) {
-      this.collection = await this.getOrCreateCollection(collectionName);
+      this.collection = await this.getOrCreateRemoteCollection(collectionName);
     }
 
     console.time('Chroma Query');
