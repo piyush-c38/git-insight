@@ -1,5 +1,6 @@
 import { parentPort } from 'worker_threads';
 import { pipeline, env } from '@xenova/transformers';
+import { logProcessMemory, RENDER_MEMORY_LIMIT_MB } from '../lib/memory';
 
 env.allowLocalModels = false;
 
@@ -13,13 +14,26 @@ type WorkerMessage = EmbedRequest | { type: 'shutdown' };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let extractor: any = null;
+let modelLoadPromise: Promise<void> | null = null;
 
-async function ensureModel() {
-  if (!extractor) {
+async function ensureModel(): Promise<void> {
+  if (extractor) return;
+  if (modelLoadPromise) return modelLoadPromise;
+
+  modelLoadPromise = (async () => {
+    logProcessMemory('embedding worker before model load');
     console.time('Embedding Model Initialization');
     extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
     console.timeEnd('Embedding Model Initialization');
-  }
+    const after = logProcessMemory('embedding worker after model load');
+    if (after.rssMb > RENDER_MEMORY_LIMIT_MB) {
+      console.warn(
+        `[memory] Process RSS ${after.rssMb}MB exceeds Render limit (${RENDER_MEMORY_LIMIT_MB}MB). Consider lowering EMBEDDING_BATCH_SIZE.`
+      );
+    }
+  })();
+
+  return modelLoadPromise;
 }
 
 async function embedTexts(texts: string[]): Promise<number[][]> {
@@ -36,13 +50,7 @@ async function embedTexts(texts: string[]): Promise<number[][]> {
   return embeddings;
 }
 
-void ensureModel()
-  .then(() => {
-    parentPort?.postMessage({ type: 'ready' });
-  })
-  .catch((error: Error) => {
-    parentPort?.postMessage({ type: 'error', message: error.message });
-  });
+parentPort?.postMessage({ type: 'ready' });
 
 parentPort?.on('message', async (message: WorkerMessage) => {
   if (message.type === 'shutdown') {

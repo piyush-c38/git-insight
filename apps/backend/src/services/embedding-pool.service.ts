@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { Worker } from 'worker_threads';
 import { yieldToEventLoop } from '../lib/async-utils';
+import { logProcessMemory } from '../lib/memory';
 import type { CodeChunk } from './chunk.service';
 
 export type EmbeddingRecord = {
@@ -27,7 +28,8 @@ type WorkerSlot = {
   busy: boolean;
 };
 
-const WORKER_COUNT = Math.max(1, Math.min(4, Number(process.env.EMBEDDING_WORKERS) || 2));
+/** Default 1 worker to stay within Render 512MB (each worker loads its own ONNX model). */
+const WORKER_COUNT = Math.max(1, Math.min(4, Number(process.env.EMBEDDING_WORKERS) || 1));
 const BATCH_SIZE = Math.max(1, Number(process.env.EMBEDDING_BATCH_SIZE) || 8);
 
 function resolveWorkerScript(): { scriptPath: string; execArgv?: string[] } {
@@ -59,6 +61,7 @@ class EmbeddingPoolService {
     }
 
     this.readyPromise = new Promise<void>((resolve, reject) => {
+      logProcessMemory('embedding pool before worker spawn');
       const { scriptPath, execArgv } = resolveWorkerScript();
       let readyCount = 0;
       let startupError: Error | null = null;
@@ -72,7 +75,10 @@ class EmbeddingPoolService {
           if (message.type === 'ready') {
             readyCount += 1;
             if (readyCount === WORKER_COUNT) {
-              console.log(`[perf] Embedding worker pool ready (${WORKER_COUNT} workers, batch size ${BATCH_SIZE})`);
+              logProcessMemory('embedding pool after worker spawn (model loads lazily on first embed)');
+              console.log(
+                `[perf] Embedding worker pool ready (${WORKER_COUNT} worker(s), batch size ${BATCH_SIZE}, lazy model init)`
+              );
               resolve();
             }
             return;
@@ -145,6 +151,7 @@ class EmbeddingPoolService {
   ): Promise<EmbeddingRecord[]> {
     console.time('Embedding Generation');
     const startMs = performance.now();
+    logProcessMemory('embedding pool before embedChunks');
     await this.ensureWorkers();
 
     const records: EmbeddingRecord[] = [];
@@ -185,6 +192,7 @@ class EmbeddingPoolService {
 
     await Promise.all(Array.from({ length: WORKER_COUNT }, () => runWorker()));
     console.timeEnd('Embedding Generation');
+    logProcessMemory('embedding pool after embedChunks');
     console.log(
       `[perf] Embedding generation produced ${records.length} embeddings in ${(performance.now() - startMs).toFixed(3)}ms`
     );
@@ -193,7 +201,9 @@ class EmbeddingPoolService {
   }
 
   async embedQuery(text: string): Promise<number[]> {
+    logProcessMemory('embedding pool before embedQuery');
     const [embedding] = await this.embedBatch([text]);
+    logProcessMemory('embedding pool after embedQuery');
     return embedding;
   }
 

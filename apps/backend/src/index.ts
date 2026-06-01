@@ -1,5 +1,6 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import { ApiError, handleErrors } from './lib/errors';
+import { logProcessMemory } from './lib/memory';
 import apiRoutes from './api/routes/index';
 import config from './config';
 import { embeddingPoolService } from './services/embedding-pool.service';
@@ -36,11 +37,20 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 });
 
 app.listen(port, () => {
+  logProcessMemory('server startup');
   console.log(`[server]: Server is running on port ${port}`);
-  void embeddingPoolService
-    .embedQuery('warmup')
-    .then(() => console.log('[server]: Embedding worker pool warmed up'))
-    .catch((error: Error) => {
-      console.warn('[server]: Embedding worker warmup failed:', error.message);
-    });
+
+  if (process.env.EMBEDDING_WARMUP === 'true') {
+    void embeddingPoolService
+      .embedQuery('warmup')
+      .then(() => {
+        logProcessMemory('server after embedding warmup');
+        console.log('[server]: Embedding worker pool warmed up');
+      })
+      .catch((error: Error) => {
+        console.warn('[server]: Embedding worker warmup failed:', error.message);
+      });
+  } else {
+    console.log('[server]: Embedding model will load lazily on first analysis or chat request');
+  }
 });
