@@ -2,6 +2,8 @@
 
 An AI GitHub Explainer tool that analyzes a GitHub repository and explains how it works in a simple way. It shows the file structure, important dependencies, architecture, and key parts of the codebase. You can also ask questions about the repository using AI.
 
+Demo Link: https://git-insight-one.vercel.app/ 
+
 ## Tech Stack
 
 ### Frontend
@@ -113,3 +115,10 @@ Reason:
 * Analysis time depends on repository size.
 * Large repositories may take longer to process.
 * Public repositories are fully supported.
+
+## Disclaimer
+
+> GitInsight is an MVP project under active development and is currently maintained solely by the repository owner.
+> Some features may be incomplete, experimental, or subject to change.
+
+> Feedback, bug reports, suggestions, and contributions are always appreciated.
