@@ -8,6 +8,7 @@ import { fetcher } from '@/lib/api';
 import {
   createDependencyGraph,
   getDeclaredPackageDependencies,
+  packageDepsFromKnowledge,
   type DeclaredDependency,
 } from '@/lib/graph-utils';
 import type { Edge, Node } from 'reactflow';
@@ -22,13 +23,13 @@ export default function DependenciesPage() {
   );
 
   const { nodes, edges, list } = useMemo(() => {
-    const declaredDependencies = getDeclaredPackageDependencies(
-      analysisData?.packageJson,
-      analysisData?.dependencies as Record<string, string>
-    );
+    const fromKnowledge = packageDepsFromKnowledge(analysisData?.knowledge?.dependencySummary);
+    const fromPackageJson = getDeclaredPackageDependencies(analysisData?.packageJson);
+    const declaredDependencies =
+      Object.keys(fromKnowledge).length > 0 ? fromKnowledge : fromPackageJson;
 
     if (Object.keys(declaredDependencies).length === 0) {
-      return { nodes: [] as Node[], edges: [] as Edge[], list: [] as string[] };
+      return { nodes: [] as Node[], edges: [] as Edge[], list: [] as DeclaredDependency[] };
     }
 
     const { nodes: graphNodes, edges: graphEdges } = createDependencyGraph(
@@ -51,19 +52,26 @@ export default function DependenciesPage() {
     return <DashboardLayout><PageShell>Analysis in progress: {analysisData.status}</PageShell></DashboardLayout>;
   }
 
+  const manifestSources = analysisData.knowledge?.dependencySummary?.manifestFiles ?? [];
+
   return (
     <DashboardLayout>
       <PageShell>
         <PageHeader
           eyebrow="Visualization"
           title="Dependency graph"
-          description="Dependencies declared in the analyzed repo's package.json."
+          description="Package dependencies from project manifests (package.json, requirements.txt, go.mod, etc.). Lock files and source imports are excluded."
         />
+        {manifestSources.length > 0 ? (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Sources: {manifestSources.join(', ')}
+          </p>
+        ) : null}
         <GraphCanvas nodes={nodes} edges={edges} height={600} />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {list.length === 0 ? (
             <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
-              No dependencies detected.
+              No package dependencies detected in project manifests.
             </div>
           ) : (
             list.map((dep: DeclaredDependency) => (
@@ -73,7 +81,7 @@ export default function DependenciesPage() {
                   <div className="text-xs text-muted-foreground">{dep.version}</div>
                 </div>
                 <span className="rounded-full bg-secondary px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {dep.category}
+                  {dep.semanticCategory ?? dep.category}
                 </span>
               </div>
             ))

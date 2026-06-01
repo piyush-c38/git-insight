@@ -81,12 +81,48 @@ export async function chatWithRepo(req: Request, res: Response) {
       repoMetadata: analysis.repoMetadata,
       packageJson: analysis.packageJson,
       files: analysis.files,
+      knowledge: analysis.knowledge,
     });
     res.json({ reply });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error during chat' });
   }
+}
+
+function normalizeRepoRelativePath(filePath: string): string {
+  return filePath.replace(/\\/g, '/').replace(/^\//, '');
+}
+
+function resolveRepoFilePath(
+  requestedPath: string,
+  localPath: string,
+  knownFiles?: string[]
+): { relativePath: string; absolutePath: string } | null {
+  const normalized = normalizeRepoRelativePath(requestedPath);
+  const candidates = new Set<string>([normalized]);
+
+  if (knownFiles?.length) {
+    const exact = knownFiles.find((f) => normalizeRepoRelativePath(f) === normalized);
+    if (exact) candidates.add(normalizeRepoRelativePath(exact));
+
+    const suffixMatch = knownFiles.find((f) => {
+      const rel = normalizeRepoRelativePath(f);
+      return rel.endsWith(`/${normalized}`) || rel === normalized;
+    });
+    if (suffixMatch) candidates.add(normalizeRepoRelativePath(suffixMatch));
+  }
+
+  for (const relativePath of candidates) {
+    const absolutePath = path.resolve(localPath, relativePath);
+    const repoRoot = path.resolve(localPath);
+    if (!absolutePath.startsWith(repoRoot)) continue;
+    if (fs.existsSync(absolutePath) && fs.statSync(absolutePath).isFile()) {
+      return { relativePath, absolutePath };
+    }
+  }
+
+  return null;
 }
 
 export async function getFile(req: Request, res: Response) {
@@ -104,14 +140,23 @@ export async function getFile(req: Request, res: Response) {
     const repoUrl = analysis.repoUrl;
     const repoName = getRepoCloneName(repoUrl);
     const localPath = path.join(config.clonePath!, repoName);
-    const absolutePath = path.join(localPath, filePath);
+    const requested = normalizeRepoRelativePath(filePath);
+    const resolved = resolveRepoFilePath(requested, localPath, analysis.files);
 
-    if (!fs.existsSync(absolutePath)) {
+    console.debug('[file-explorer]', {
+      analysisId,
+      requestedPath: requested,
+      resolvedPath: resolved?.relativePath ?? null,
+      absolutePath: resolved?.absolutePath ?? path.resolve(localPath, requested),
+      found: Boolean(resolved),
+    });
+
+    if (!resolved) {
       return res.status(404).json({ message: 'File not found in cloned repository' });
     }
 
-    const content = fs.readFileSync(absolutePath, 'utf8');
-    res.json({ filePath, content });
+    const content = fs.readFileSync(resolved.absolutePath, 'utf8');
+    res.json({ filePath: resolved.relativePath, content });
   } catch (error) {
     console.error('Error reading file from cloned repo:', error);
     res.status(500).json({ message: 'Failed to read file' });

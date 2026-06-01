@@ -4,6 +4,7 @@ import path from 'path';
 import config from '../config';
 import { ApiError } from '../lib/errors';
 import { shouldSkipDirectory } from '../lib/embeddable-files';
+import { isLockFile } from '../lib/manifest-files';
 import { yieldToEventLoop } from '../lib/async-utils';
 
 interface RepoMetadata {
@@ -77,7 +78,7 @@ class GitHubService {
           if (!shouldSkipDirectory(file)) {
             queue.push(filePath);
           }
-        } else {
+        } else if (!isLockFile(file)) {
           allFiles.push(filePath);
         }
       }

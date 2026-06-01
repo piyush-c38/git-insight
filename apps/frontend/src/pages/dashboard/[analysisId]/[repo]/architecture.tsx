@@ -32,7 +32,12 @@ export default function ArchitecturePage() {
     pathValue.replace(prefix, '').replace(/^\//, '')
   );
 
-  const architectureGraph = createArchitectureMermaid(data.repoUrl, relativeFiles);
+  const architectureGraph = createArchitectureMermaid(
+    data.repoUrl,
+    relativeFiles,
+    data.knowledge?.architecture ?? null
+  );
+  const architectureSummary = data.knowledge?.architecture?.summary;
 
   return (
     <DashboardLayout>
@@ -40,8 +45,11 @@ export default function ArchitecturePage() {
         <PageHeader
           eyebrow="Visualization"
           title="Architecture overview"
-          description="High-level system map inferred from repo structure."
+          description="Logical system architecture (frontend, backend, database, integrations)."
         />
+        {architectureSummary ? (
+          <p className="mb-4 text-sm text-muted-foreground">{architectureSummary}</p>
+        ) : null}
         <div className="rounded-2xl border border-border bg-card p-6">
           <MermaidDiagram chart={architectureGraph} />
         </div>

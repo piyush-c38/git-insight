@@ -78,19 +78,17 @@ function buildSampleQuestions(data?: AnalysisData): string[] {
   const firstFile = data?.files?.[0]?.split('/').pop();
 
   const questions = [
-    `Walk me through the architecture of ${repoName}.`,
-    firstTech
-      ? `How is ${firstTech} used across the codebase?`
-      : 'What are the key modules and how do they interact?',
+    `Explain the architecture of ${repoName}.`,
+    firstTech ? `What is the tech stack of ${repoName}?` : 'What technologies is this project built with?',
     topDependency
-      ? `Where is ${topDependency} used and why was it chosen?`
-      : 'Which dependencies are most important and where are they used?',
+      ? `What dependencies are used and why is ${topDependency} included?`
+      : 'What are the main dependencies and how are they categorized?',
     hasBuildScript
-      ? 'Which files are involved in the build process and how does it work?'
+      ? 'How do I get started and run this project locally?'
       : hasTestScript
         ? 'How is testing set up and where are the main tests?'
         : firstFile
-          ? `Start from ${firstFile} and explain the main request flow.`
+          ? `Where is ${firstFile} used and explain the login flow.`
           : 'Explain the main request flow from entry point to output.',
   ];
 

@@ -10,6 +10,8 @@ import { ApiError } from '../lib/errors';
 import { computeRepoSizeStats, logAnalysisSummary, logStageDuration } from '../lib/perf';
 import { yieldEvery } from '../lib/async-utils';
 import { filterEmbeddablePaths } from '../lib/embeddable-files';
+import { knowledgeGeneratorService } from './knowledge/knowledge-generator.service';
+import { RepositoryKnowledge } from '../types/knowledge';
 
 export type AnalysisStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
 
@@ -53,6 +55,7 @@ export interface AnalysisRecord {
   dependencies?: Record<string, unknown>;
   files?: string[];
   parsedData?: unknown[];
+  knowledge?: RepositoryKnowledge;
   error?: string;
 }
 
@@ -316,63 +319,86 @@ class AnalysisService {
 
       this.updateProgress(analysisId, {
         step: 'chunking',
-        progress: mapProgress('chunking', 0.2),
-      });
-      const { chunks } = chunkService.generateChunksForFiles(embeddableFiles);
-      chunksGenerated = chunks.length;
-      this.updateProgress(analysisId, {
-        step: 'embedding',
-        progress: mapProgress('embedding', 0),
-        chunksTotal: chunks.length,
-        chunksProcessed: 0,
+        progress: mapProgress('chunking', 0.5),
+        message: 'Generating embeddings and repository knowledge in parallel',
       });
       this.throwIfCancelled(analysisId);
 
-      const embeddingResult = await embeddingService.generateEmbeddingsForChunks(
-        chunks,
-        () => this.isCancelled(analysisId),
-        ({ chunksProcessed, chunksTotal }) => {
-          this.updateProgress(analysisId, {
-            step: 'embedding',
-            progress: mapProgress('embedding', chunksTotal > 0 ? chunksProcessed / chunksTotal : 0),
-            chunksTotal,
-            chunksProcessed,
-          });
+      const embeddingPipeline = async () => {
+        const { chunks } = chunkService.generateChunksForFiles(embeddableFiles);
+        chunksGenerated = chunks.length;
+        this.updateProgress(analysisId, {
+          step: 'embedding',
+          progress: mapProgress('embedding', 0),
+          chunksTotal: chunks.length,
+          chunksProcessed: 0,
+        });
+        this.throwIfCancelled(analysisId);
+
+        const embeddingResult = await embeddingService.generateEmbeddingsForChunks(
+          chunks,
+          () => this.isCancelled(analysisId),
+          ({ chunksProcessed, chunksTotal }) => {
+            this.updateProgress(analysisId, {
+              step: 'embedding',
+              progress: mapProgress('embedding', chunksTotal > 0 ? chunksProcessed / chunksTotal : 0),
+              chunksTotal,
+              chunksProcessed,
+            });
+          }
+        );
+
+        embeddingsGenerated = embeddingResult.embeddings.length;
+        const embeddings = embeddingResult.embeddings;
+        this.throwIfCancelled(analysisId);
+
+        if (embeddings.length === 0 && this.isCancelled(analysisId)) {
+          throw new CancelledAnalysisError();
         }
-      );
 
-      embeddingsGenerated = embeddingResult.embeddings.length;
-      const embeddings = embeddingResult.embeddings;
-      this.throwIfCancelled(analysisId);
+        this.updateProgress(analysisId, {
+          step: 'storing',
+          progress: mapProgress('storing', 0.2),
+          chunksProcessed: embeddings.length,
+          chunksTotal: chunks.length,
+        });
 
-      if (embeddings.length === 0 && this.isCancelled(analysisId)) {
-        throw new CancelledAnalysisError();
-      }
+        const documents = embeddings.map((emb, index) => ({
+          id: `${emb.filePath}-${emb.symbolName ?? 'chunk'}-${index}`,
+          embedding: emb.embedding,
+          document: emb.content,
+          metadata: {
+            filePath: toRelativePath(localPath, emb.filePath),
+            symbolName: emb.symbolName,
+            symbolType: emb.symbolType,
+          },
+        }));
 
-      this.updateProgress(analysisId, {
-        step: 'storing',
-        progress: mapProgress('storing', 0.2),
-        chunksProcessed: embeddings.length,
-        chunksTotal: chunks.length,
-      });
+        vectorsInserted = documents.length;
+        await vectorService.addDocuments(collectionName, documents);
+      };
 
-      const documents = embeddings.map((emb, index) => ({
-        id: `${emb.filePath}-${emb.symbolName ?? 'chunk'}-${index}`,
-        embedding: emb.embedding,
-        document: emb.content,
-        metadata: {
-          filePath: toRelativePath(localPath, emb.filePath),
-          symbolName: emb.symbolName,
-          symbolType: emb.symbolType,
-        },
-      }));
+      const knowledgePipeline = async () => {
+        console.time('Repository Knowledge Generation');
+        const knowledge = knowledgeGeneratorService.generateAll({
+          repoRoot: localPath,
+          relativeFiles,
+          parsedData,
+          packageJson,
+          repoLanguages: repoMetadata?.techStack ?? [],
+        });
+        console.timeEnd('Repository Knowledge Generation');
+        return knowledge;
+      };
 
-      vectorsInserted = documents.length;
-      await vectorService.addDocuments(collectionName, documents);
+      console.time('Parallel Analysis Phase');
+      const [, knowledge] = await Promise.all([embeddingPipeline(), knowledgePipeline()]);
+      console.timeEnd('Parallel Analysis Phase');
 
       console.time('Dependency Graph Generation');
-      const dependencies = parsedData.reduce((acc, data) => {
-        return { ...acc, [data.filePath]: data.dependencies };
+      const dependencies = parsedData.reduce<Record<string, string[]>>((acc, data) => {
+        acc[toRelativePath(localPath, data.filePath)] = data.dependencies;
+        return acc;
       }, {});
       console.timeEnd('Dependency Graph Generation');
 
@@ -397,6 +423,7 @@ class AnalysisService {
         dependencies,
         files: relativeFiles,
         parsedData,
+        knowledge,
       };
     } catch (error) {
       if (error instanceof CancelledAnalysisError || this.isCancelled(analysisId)) {

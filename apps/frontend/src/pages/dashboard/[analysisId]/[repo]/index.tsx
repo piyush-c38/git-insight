@@ -5,7 +5,7 @@ import useSWR from 'swr';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { PageHeader, PageShell } from '@/components/page-header';
 import { fetcher } from '@/lib/api';
-import { getDeclaredPackageDependencies } from '@/lib/graph-utils';
+import { getDeclaredPackageDependencies, packageDepsFromKnowledge } from '@/lib/graph-utils';
 import { Boxes, FileCode2, GitFork, Star } from 'lucide-react';
 
 function formatCount(value?: number) {
@@ -92,13 +92,12 @@ export default function DashboardPage() {
   }, [data?.repoUrl]);
 
   const dependencyDetails = useMemo(() => {
-    const declaredDependencies = getDeclaredPackageDependencies(
-      data?.packageJson,
-      data?.dependencies as Record<string, string>
-    );
-
-    return Object.values(declaredDependencies);
-  }, [data?.dependencies, data?.packageJson]);
+    const fromKnowledge = packageDepsFromKnowledge(data?.knowledge?.dependencySummary);
+    if (Object.keys(fromKnowledge).length > 0) {
+      return Object.values(fromKnowledge);
+    }
+    return Object.values(getDeclaredPackageDependencies(data?.packageJson));
+  }, [data?.knowledge?.dependencySummary, data?.packageJson]);
 
   const dependencyCount = dependencyDetails.length;
 

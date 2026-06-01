@@ -7,6 +7,7 @@ export interface DeclaredDependency {
   name: string;
   version: string;
   category: DependencyCategory;
+  semanticCategory?: string;
 }
 
 export interface FileTreeNode {
@@ -125,10 +126,41 @@ export const createDependencyGraph = (dependencies: Record<string, DeclaredDepen
   return { nodes, edges };
 };
 
-export const getDeclaredPackageDependencies = (
-  packageJson: any,
-  fallbackDependencies: Record<string, string> = {}
-) => {
+export type DependencySummaryPayload = {
+  byCategory?: Record<
+    string,
+    Array<{ name: string; version: string; category: string; explanation?: string; source?: string }>
+  >;
+};
+
+const DISPLAY_CATEGORY_MAP: Record<string, string> = {
+  UI: 'Frontend',
+  Other: 'Utilities',
+};
+
+export function packageDepsFromKnowledge(
+  summary?: DependencySummaryPayload | null
+): Record<string, DeclaredDependency> {
+  if (!summary?.byCategory) return {};
+
+  const result: Record<string, DeclaredDependency> = {};
+  for (const [category, deps] of Object.entries(summary.byCategory)) {
+    if (!Array.isArray(deps)) continue;
+    for (const dep of deps) {
+      const displayCategory = DISPLAY_CATEGORY_MAP[dep.category] ?? dep.category ?? category;
+      const scope = dep.source?.includes('devDependencies') ? 'dev' : 'prod';
+      result[dep.name] = {
+        name: dep.name,
+        version: dep.version,
+        category: (scope === 'dev' ? 'dev' : 'prod') as DependencyCategory,
+        semanticCategory: displayCategory,
+      };
+    }
+  }
+  return result;
+}
+
+export const getDeclaredPackageDependencies = (packageJson: any) => {
   const sections: Array<{ category: DependencyCategory; value: unknown }> = [
     { category: 'prod', value: packageJson?.dependencies },
     { category: 'dev', value: packageJson?.devDependencies },
@@ -136,7 +168,7 @@ export const getDeclaredPackageDependencies = (
     { category: 'optional', value: packageJson?.optionalDependencies },
   ];
 
-  const fromPackageJson = sections.reduce((acc, section) => {
+  return sections.reduce((acc, section) => {
     if (!section.value || typeof section.value !== 'object') return acc;
 
     return Object.entries(section.value as Record<string, string>).reduce((next, [name, version]) => {
@@ -147,19 +179,6 @@ export const getDeclaredPackageDependencies = (
       };
       return next;
     }, acc);
-  }, {} as Record<string, DeclaredDependency>);
-
-  if (Object.keys(fromPackageJson).length > 0) {
-    return fromPackageJson;
-  }
-
-  return Object.entries(fallbackDependencies).reduce((acc, [name, version]) => {
-    acc[name] = {
-      name,
-      version,
-      category: 'unknown',
-    };
-    return acc;
   }, {} as Record<string, DeclaredDependency>);
 };
 
@@ -208,7 +227,23 @@ export const createComponentRelationshipGraph = (parsedData: any[]) => {
 
 const sanitizeMermaidId = (value: string) => value.replace(/[^a-zA-Z0-9_]/g, '_');
 
-export const createArchitectureMermaid = (repoUrl: string, files: string[]) => {
+export type ArchitectureKnowledgePayload = {
+  diagram?: {
+    mermaid?: string;
+    nodes?: { id: string; label: string; layer: string }[];
+  };
+  summary?: string;
+};
+
+export const createArchitectureMermaid = (
+  repoUrl: string,
+  files: string[],
+  architecture?: ArchitectureKnowledgePayload | null
+) => {
+  if (architecture?.diagram?.mermaid) {
+    return architecture.diagram.mermaid;
+  }
+
   const topLevelCounts = new Map<string, number>();
   files.forEach((filePath) => {
     const normalized = filePath.replace(/^[A-Za-z]:/g, '');
@@ -231,6 +266,42 @@ export const createArchitectureMermaid = (repoUrl: string, files: string[]) => {
     });
 
   return lines.join('\n');
+};
+
+export const createLogicalArchitectureGraph = (architecture?: ArchitectureKnowledgePayload | null) => {
+  const nodes: Node[] = [];
+  const edges: Edge[] = [];
+
+  if (!architecture?.diagram?.nodes?.length) {
+    return { nodes, edges };
+  }
+
+  const layerY: Record<string, number> = {
+    frontend: 0,
+    shared: 120,
+    backend: 240,
+    database: 360,
+    external: 480,
+  };
+
+  const layerCounts = new Map<string, number>();
+
+  architecture.diagram.nodes.forEach((node, index) => {
+    const layer = node.layer || 'shared';
+    const count = layerCounts.get(layer) ?? 0;
+    layerCounts.set(layer, count + 1);
+    const x = count * 220;
+    const y = layerY[layer] ?? index * 80;
+
+    nodes.push({
+      id: node.id,
+      position: { x, y },
+      data: { label: node.label, type: layer },
+      type: 'custom',
+    });
+  });
+
+  return { nodes, edges };
 };
 
 export const createFlowMermaid = (parsedData: any[]) => {

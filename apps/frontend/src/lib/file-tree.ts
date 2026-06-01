@@ -36,15 +36,9 @@ export const buildTree = (paths: string[]): RepoFile => {
   return root;
 };
 
+/** Backend already stores repo-relative paths; do not strip shared prefixes. */
 export const normalizeFilePaths = (paths: string[]) => {
-  if (paths.length === 0) return [];
-
-  const prefix = paths.reduce((acc: string, current: string) => {
-    if (!acc) return current;
-    let index = 0;
-    while (index < acc.length && index < current.length && acc[index] === current[index]) index += 1;
-    return acc.slice(0, index);
-  }, '');
-
-  return paths.map((pathValue: string) => pathValue.replace(prefix, '').replace(/^\//, ''));
+  return paths
+    .map((pathValue) => pathValue.replace(/\\/g, '/').replace(/^\//, ''))
+    .filter(Boolean);
 };
