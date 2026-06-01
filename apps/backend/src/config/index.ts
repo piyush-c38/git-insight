@@ -16,7 +16,7 @@ const config = {
   /** Optional. When unset, vectors persist locally at chromaDataPath (no separate Chroma server). */
   chromaUrl: process.env.CHROMA_URL,
   chromaDataPath: process.env.CHROMA_DATA_PATH || defaultChromaDataPath,
-  clonePath: process.env.CLONE_PATH || '/tmp/ai-github-explainer-clones',
+  clonePath: process.env.CLONE_PATH || '/tmp/git-insight-clones',
   tavilyApiKey: process.env.TAVILY_API_KEY,
   tavilyApiUrl: process.env.TAVILY_API_URL,
   corsOrigin: process.env.CORS_ORIGIN || process.env.FRONTEND_URL,

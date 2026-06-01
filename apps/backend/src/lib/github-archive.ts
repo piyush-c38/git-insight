@@ -86,7 +86,7 @@ export async function downloadAndExtractGitHubArchive(options: {
       const response = await fetch(archiveUrl, {
         headers: {
           Accept: 'application/vnd.github+json',
-          'User-Agent': 'ai-github-explainer',
+          'User-Agent': 'git-insight',
           ...headers,
         },
         redirect: 'follow',

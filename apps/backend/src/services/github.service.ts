@@ -33,7 +33,7 @@ class GitHubService {
   private githubHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github+json',
-      'User-Agent': 'ai-github-explainer',
+      'User-Agent': 'git-insight',
     };
 
     if (config.githubToken) {

@@ -1,5 +1,5 @@
 {
-  "name": "ai-github-explainer",
+  "name": "git-insight",
   "private": true,
   "workspaces": [
     "apps/*",
