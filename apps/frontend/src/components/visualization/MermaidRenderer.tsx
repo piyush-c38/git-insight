@@ -46,5 +46,5 @@ export default function MermaidRenderer({ chart }: { chart: string }) {
 
   if (!chart) return null;
 
-  return <div ref={ref} className="min-h-[200px]" />;
+  return <div ref={ref} className="min-h-50" />;
 }

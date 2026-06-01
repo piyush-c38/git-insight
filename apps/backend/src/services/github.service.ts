@@ -3,6 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import config from '../config';
 import { ApiError } from '../lib/errors';
+import { shouldSkipDirectory } from '../lib/embeddable-files';
+import { yieldToEventLoop } from '../lib/async-utils';
 
 interface RepoMetadata {
   stars: number;
@@ -31,49 +33,62 @@ class GitHubService {
   async cloneRepo(repoUrl: string): Promise<string> {
     const repoName = getRepoCloneName(repoUrl);
     const localPath = path.join(config.clonePath!, repoName);
-
+    
     if (fs.existsSync(localPath)) {
-      console.log(`Repository already exists at ${localPath}. Skipping clone.`);
+      console.log(`[perf] Repository already exists at ${localPath}. Skipping clone.`);
       return localPath;
     }
-
+    
     try {
+      console.time('Repository Cloning');
       await this.git.clone(repoUrl, localPath);
-      console.log(`Cloned repository to ${localPath}`);
+      console.log(`[perf] Cloned repository to ${localPath}`);
+      console.timeEnd('Repository Cloning');
       return localPath;
     } catch (error) {
       console.error('Failed to clone repository:', error);
+      console.timeEnd('Repository Cloning');
       throw new ApiError(500, 'Failed to clone repository');
     }
   }
 
   async scanFiles(localPath: string, shouldStop?: () => boolean): Promise<string[]> {
     const allFiles: string[] = [];
-    const walk = (dir: string) => {
+    const queue: string[] = [localPath];
+    let scannedDirs = 0;
+
+    while (queue.length > 0) {
       if (shouldStop?.()) {
-        return;
+        break;
       }
 
-      const files = fs.readdirSync(dir);
-      for (const file of files) {
+      const dir = queue.shift();
+      if (!dir) continue;
+
+      const entries = fs.readdirSync(dir);
+      for (const file of entries) {
         if (shouldStop?.()) {
-          return;
+          return allFiles;
         }
 
         const filePath = path.join(dir, file);
         const stat = fs.statSync(filePath);
         if (stat.isDirectory()) {
-          // Ignore node_modules and .git
-          if (file !== 'node_modules' && file !== '.git') {
-            walk(filePath);
+          if (!shouldSkipDirectory(file)) {
+            queue.push(filePath);
           }
         } else {
           allFiles.push(filePath);
         }
       }
-    };
 
-    walk(localPath);
+      scannedDirs += 1;
+      if (scannedDirs % 25 === 0) {
+        await yieldToEventLoop();
+      }
+    }
+
+    console.log(`[perf] File discovery found ${allFiles.length} files under ${localPath}`);
     return allFiles;
   }
 

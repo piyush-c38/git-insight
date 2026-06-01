@@ -17,7 +17,7 @@ export default function Home() {
       <div className="relative min-h-screen">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[520px] opacity-60"
+        className="pointer-events-none absolute inset-x-0 top-0 h-130 opacity-60"
         style={{
           background:
             'radial-gradient(60% 60% at 50% 0%, oklch(0.72 0.16 250 / 0.25) 0%, transparent 60%), radial-gradient(40% 40% at 80% 10%, oklch(0.7 0.18 320 / 0.18) 0%, transparent 70%)',

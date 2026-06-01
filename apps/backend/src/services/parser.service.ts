@@ -12,11 +12,38 @@ interface ParsedData {
   exports: string[];
 }
 
+export type ParseMetrics = {
+  treeSitterMs: number;
+  treeSitterFiles: number;
+  babelMs: number;
+  babelFiles: number;
+};
+
 class ParserService {
   private parser: Parser;
+  private treeSitterMs = 0;
+  private treeSitterFiles = 0;
+  private babelMs = 0;
+  private babelFiles = 0;
 
   constructor() {
     this.parser = new Parser();
+  }
+
+  resetParseMetrics(): void {
+    this.treeSitterMs = 0;
+    this.treeSitterFiles = 0;
+    this.babelMs = 0;
+    this.babelFiles = 0;
+  }
+
+  getParseMetrics(): ParseMetrics {
+    return {
+      treeSitterMs: this.treeSitterMs,
+      treeSitterFiles: this.treeSitterFiles,
+      babelMs: this.babelMs,
+      babelFiles: this.babelFiles,
+    };
   }
 
   private getLanguage(filePath: string): any {
@@ -35,12 +62,17 @@ class ParserService {
   }
 
   private parseWithTreeSitter(filePath: string, language: any): Parser.Tree {
+    const startMs = performance.now();
     this.parser.setLanguage(language);
     const sourceCode = fs.readFileSync(filePath, 'utf8');
-    return this.parser.parse(sourceCode);
+    const tree = this.parser.parse(sourceCode);
+    this.treeSitterMs += performance.now() - startMs;
+    this.treeSitterFiles += 1;
+    return tree;
   }
 
   private extractDependenciesBabel(filePath: string): { dependencies: string[], exports: string[] } {
+    const startMs = performance.now();
     const sourceCode = fs.readFileSync(filePath, 'utf8');
     const dependencies: string[] = [];
     const exports: string[] = [];
@@ -90,6 +122,8 @@ class ParserService {
       },
     });
 
+    this.babelMs += performance.now() - startMs;
+    this.babelFiles += 1;
     return { dependencies, exports };
   }
 

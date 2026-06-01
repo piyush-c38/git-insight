@@ -38,7 +38,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-surface-1 border-r border-outline p-4">
+    <aside className="w-64 shrink-0 bg-surface-1 border-r border-outline p-4">
       <div className="flex items-center justify-center h-16 mb-4">
         <h1 className="text-2xl font-bold text-primary">AI Explainer</h1>
       </div>

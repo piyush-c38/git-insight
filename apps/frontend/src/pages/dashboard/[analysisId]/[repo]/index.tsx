@@ -189,11 +189,24 @@ export default function DashboardPage() {
   if (error) return <DashboardLayout><PageShell>Failed to load analysis.</PageShell></DashboardLayout>;
   if (!data) return <DashboardLayout><PageShell>Loading analysis...</PageShell></DashboardLayout>;
   if (data.status !== 'completed') {
+    const progress = typeof data.progress === 'number' ? data.progress : 0;
+    const step = typeof data.step === 'string' ? data.step : data.status;
     return (
       <DashboardLayout>
         <PageShell>
           <div className="absolute top-[40%] left-[50%] mx-auto w-full translate-[-35%] flex max-w-2xl flex-col items-center gap-4 py-16 text-center">
-            <div className="text-sm text-muted-foreground">Analysis in progress: {data.status}</div>
+            <div className="text-sm text-muted-foreground">
+              Analysis in progress: {step}
+              {typeof data.chunksTotal === 'number' && data.chunksTotal > 0
+                ? ` (${data.chunksProcessed ?? 0}/${data.chunksTotal} chunks)`
+                : ''}
+            </div>
+            <div className="h-1.5 w-full max-w-md overflow-hidden rounded-full bg-secondary/60">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${Math.max(progress, 5)}%` }}
+              />
+            </div>
           </div>
         </PageShell>
       </DashboardLayout>

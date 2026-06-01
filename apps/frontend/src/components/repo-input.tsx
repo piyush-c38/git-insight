@@ -61,21 +61,17 @@ export default function RepoInput({ className, autoFocus }: Props) {
     }
 
 
-    progressTimerRef.current = window.setInterval(() => {
-      setProgress((current) => {
-        if (current >= 95) return current;
-        const next = current + (current < 35 ? 4 : current < 70 ? 2 : 1);
-        return Math.min(next, 95);
-      });
-    }, 2000); 
-
     pollTimerRef.current = window.setInterval(async () => {
       try {
-        const response = await fetch(`/api/analysis/${analysisId}`);
+        const response = await fetch(`/api/analysis/${analysisId}/status`);
         if (!response.ok) return;
 
         const data = await response.json();
         if (cancelled) return;
+
+        if (typeof data.progress === 'number') {
+          setProgress(Math.max(8, Math.min(data.progress, 99)));
+        }
 
         if (data.status === 'completed') {
           clearTimers();
@@ -98,7 +94,7 @@ export default function RepoInput({ className, autoFocus }: Props) {
       } catch {
         // Keep polling; transient network errors should not cancel analysis flow.
       }
-    }, 5000);
+    }, 2000);
 
     return () => {
       cancelled = true;

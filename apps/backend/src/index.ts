@@ -2,6 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import { ApiError, handleErrors } from './lib/errors';
 import apiRoutes from './api/routes/index';
 import config from './config';
+import { embeddingPoolService } from './services/embedding-pool.service';
 
 const app: Express = express();
 const port = config.port;
@@ -22,6 +23,8 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get('/health', (_req, res) => res.status(200).json({ ok: true }));
+
 app.use('/api', apiRoutes);
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
@@ -34,4 +37,10 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 
 app.listen(port, () => {
   console.log(`[server]: Server is running on port ${port}`);
+  void embeddingPoolService
+    .embedQuery('warmup')
+    .then(() => console.log('[server]: Embedding worker pool warmed up'))
+    .catch((error: Error) => {
+      console.warn('[server]: Embedding worker warmup failed:', error.message);
+    });
 });

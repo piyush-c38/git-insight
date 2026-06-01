@@ -262,6 +262,9 @@ class RagService {
   }
 
   async getRagResponse(query: string, collectionName: string, repoContext: RepoContext = {}): Promise<string> {
+    console.time('Chat Query');
+    const ragStartMs = performance.now();
+
     try {
       const queryEmbedding = await embeddingService.generateEmbeddings(query);
       const contextResults = await vectorService.query(collectionName, queryEmbedding);
@@ -313,6 +316,7 @@ class RagService {
 
       userPromptParts.push(`Question: ${query}`);
 
+      console.time('Groq API Request');
       const completion = await this.groq.chat.completions.create({
         messages: [
           { role: 'system', content: systemPrompt },
@@ -320,7 +324,9 @@ class RagService {
         ],
         model: config.groqModel,
       });
+      console.timeEnd('Groq API Request');
 
+      console.time('Final Response Assembly');
       const reply = completion.choices[0]?.message?.content?.trim() || "Sorry, I couldn't find an answer.";
       const sources = [
         ...chunks.map((chunk) => chunk.source ?? ''),
@@ -328,8 +334,14 @@ class RagService {
         ...(webContext?.sources ?? []),
       ];
 
-      return `${reply}\n\nSources:\n${formatSources(sources)}`;
+      const response = `${reply}\n\nSources:\n${formatSources(sources)}`;
+      console.timeEnd('Final Response Assembly');
+      console.timeEnd('Chat Query');
+      console.log(`[perf] Chat query total: ${(performance.now() - ragStartMs).toFixed(3)}ms`);
+
+      return response;
     } catch (error) {
+      console.timeEnd('Chat Query');
       console.error('RAG service failed:', error);
       throw new ApiError(500, 'Failed to get RAG response');
     }

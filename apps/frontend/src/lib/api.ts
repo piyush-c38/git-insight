@@ -8,7 +8,9 @@ export function useAnalysis(analysisId: string | string[] | undefined) {
     fetcher,
     {
       refreshInterval: (latestData) =>
-        latestData?.status === 'completed' ? 0 : 5000,
+        latestData?.status === 'completed' || latestData?.status === 'failed' || latestData?.status === 'cancelled'
+          ? 0
+          : 2000,
     }
   );
 

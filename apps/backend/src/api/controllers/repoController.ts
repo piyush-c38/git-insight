@@ -32,6 +32,17 @@ export async function getAnalysis(req: Request, res: Response) {
   res.json(result);
 }
 
+export async function getAnalysisStatus(req: Request, res: Response) {
+  const { analysisId } = req.params;
+  const result = analysisService.getAnalysisStatus(analysisId);
+
+  if (!result) {
+    return res.status(404).json({ message: 'Analysis not found' });
+  }
+
+  res.json(result);
+}
+
 export async function cancelAnalysis(req: Request, res: Response) {
   const { analysisId } = req.params;
   const result = analysisService.cancelAnalysis(analysisId);
