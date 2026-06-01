@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { Worker } from 'worker_threads';
 import { yieldToEventLoop } from '../lib/async-utils';
+import { logPoolBatchDiag } from '../lib/embedding-diag';
 import { logEmbeddingThroughput } from '../lib/embedding-perf';
 import { logProcessMemory } from '../lib/memory';
 import type { CodeChunk } from './chunk.service';
@@ -32,7 +33,7 @@ type WorkerSlot = {
 /** Default 1 worker to stay within Render 512MB (each worker loads its own ONNX model). */
 const WORKER_COUNT = Math.max(1, Math.min(4, Number(process.env.EMBEDDING_WORKERS) || 1));
 /** Texts per worker message (each triggers one batched ONNX forward pass). */
-const BATCH_SIZE = Math.max(1, Number(process.env.EMBEDDING_BATCH_SIZE) || 32);
+const BATCH_SIZE = Math.max(1, Number(process.env.EMBEDDING_BATCH_SIZE) || 8);
 
 function resolveWorkerScript(): { scriptPath: string; execArgv?: string[] } {
   const compiledPath = path.join(__dirname, '../workers/embedding.worker.js');
@@ -65,6 +66,9 @@ class EmbeddingPoolService {
     this.readyPromise = new Promise<void>((resolve, reject) => {
       logProcessMemory('embedding pool before worker spawn');
       const { scriptPath, execArgv } = resolveWorkerScript();
+      console.log('[embed-diag] Worker script path:', scriptPath);
+      console.log('[embed-diag] EMBEDDING_BATCH_SIZE env:', process.env.EMBEDDING_BATCH_SIZE ?? '(unset, using default)');
+      console.log('[embed-diag] Resolved pool BATCH_SIZE:', BATCH_SIZE);
       let readyCount = 0;
       let startupError: Error | null = null;
 
@@ -116,11 +120,11 @@ class EmbeddingPoolService {
     return this.readyPromise;
   }
 
-  private async runOnWorker(worker: Worker, texts: string[]): Promise<number[][]> {
+  private async runOnWorker(worker: Worker, texts: string[], batchIndex: number): Promise<number[][]> {
     const id = `embed-${++this.requestCounter}`;
     return new Promise<number[][]>((resolve, reject) => {
       this.pendingByWorker.set(worker, { resolve, reject });
-      worker.postMessage({ type: 'embed', id, texts });
+      worker.postMessage({ type: 'embed', id, texts, batchIndex });
     });
   }
 
@@ -137,10 +141,10 @@ class EmbeddingPoolService {
     }
   }
 
-  private async embedBatch(texts: string[]): Promise<number[][]> {
+  private async embedBatch(texts: string[], batchIndex: number): Promise<number[][]> {
     const slot = await this.acquireWorker();
     try {
-      return await this.runOnWorker(slot.worker, texts);
+      return await this.runOnWorker(slot.worker, texts, batchIndex);
     } finally {
       slot.busy = false;
     }
@@ -169,6 +173,8 @@ class EmbeddingPoolService {
 
     let chunksProcessed = 0;
     const batchQueue = [...batches];
+    let poolBatchIndex = 0;
+    const poolBatchTimings: Array<{ batchIndex: number; roundTripMs: number; texts: number }> = [];
 
     const runWorker = async () => {
       while (batchQueue.length > 0) {
@@ -177,8 +183,15 @@ class EmbeddingPoolService {
         const batch = batchQueue.shift();
         if (!batch) return;
 
-        const embeddings = await this.embedBatch(batch.map((chunk) => chunk.content));
+        const batchIndex = poolBatchIndex;
+        poolBatchIndex += 1;
+        const texts = batch.map((chunk) => chunk.content);
 
+        const roundTripStart = performance.now();
+        const embeddings = await this.embedBatch(texts, batchIndex);
+        const workerRoundTripMs = performance.now() - roundTripStart;
+
+        const assemblyStart = performance.now();
         for (let index = 0; index < batch.length; index += 1) {
           const chunk = batch[index];
           records.push({
@@ -189,6 +202,17 @@ class EmbeddingPoolService {
             symbolType: chunk.symbolType,
           });
         }
+        const recordAssemblyMs = performance.now() - assemblyStart;
+
+        logPoolBatchDiag({
+          batchIndex,
+          textsSent: texts.length,
+          workerRoundTripMs,
+          recordAssemblyMs,
+          configuredBatchSize: BATCH_SIZE,
+        });
+
+        poolBatchTimings.push({ batchIndex, roundTripMs: workerRoundTripMs, texts: texts.length });
 
         chunksProcessed += batch.length;
         onProgress?.({ chunksProcessed, chunksTotal: chunks.length });
@@ -211,12 +235,30 @@ class EmbeddingPoolService {
       batchSize: BATCH_SIZE,
     });
 
+    if (poolBatchTimings.length > 0) {
+      const sumRoundTrip = poolBatchTimings.reduce((acc, row) => acc + row.roundTripMs, 0);
+      const maxRoundTrip = Math.max(...poolBatchTimings.map((row) => row.roundTripMs));
+      const firstBatch = poolBatchTimings[0];
+      console.log('[embed-diag] ── pool summary ──');
+      console.log('[embed-diag] Total pool batches:', poolBatchTimings.length);
+      console.log('[embed-diag] Sum of worker round-trips:', `${sumRoundTrip.toFixed(1)} ms`);
+      console.log('[embed-diag] Max single batch round-trip:', `${maxRoundTrip.toFixed(1)} ms`);
+      console.log('[embed-diag] First batch round-trip (often includes model load):', `${firstBatch.roundTripMs.toFixed(1)} ms`);
+      console.log(
+        '[embed-diag] Overhead outside round-trips (total - sum round-trips):',
+        `${Math.max(0, totalMs - sumRoundTrip).toFixed(1)} ms`
+      );
+      console.log(
+        '[embed-diag] Compare worker [Model inference time] vs pool [Worker round-trip] per batch to locate bottleneck'
+      );
+    }
+
     return records;
   }
 
   async embedQuery(text: string): Promise<number[]> {
     logProcessMemory('embedding pool before embedQuery');
-    const [embedding] = await this.embedBatch([text]);
+    const [embedding] = await this.embedBatch([text], 0);
     logProcessMemory('embedding pool after embedQuery');
     return embedding;
   }
