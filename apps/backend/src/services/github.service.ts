@@ -1,10 +1,15 @@
-import simpleGit, { SimpleGit } from 'simple-git';
 import fs from 'fs';
 import path from 'path';
 import config from '../config';
 import { ApiError } from '../lib/errors';
 import { shouldSkipDirectory } from '../lib/embeddable-files';
 import { isLockFile } from '../lib/manifest-files';
+import {
+  buildArchiveUrl,
+  downloadAndExtractGitHubArchive,
+  fetchDefaultBranch,
+  parseGitHubRepoUrl,
+} from '../lib/github-archive';
 import { yieldToEventLoop } from '../lib/async-utils';
 
 interface RepoMetadata {
@@ -25,31 +30,59 @@ export function getRepoCloneName(repoUrl: string) {
 }
 
 class GitHubService {
-  private git: SimpleGit;
+  private githubHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'ai-github-explainer',
+    };
 
-  constructor() {
-    this.git = simpleGit();
+    if (config.githubToken) {
+      headers.Authorization = `Bearer ${config.githubToken}`;
+    }
+
+    return headers;
   }
 
   async cloneRepo(repoUrl: string): Promise<string> {
     const repoName = getRepoCloneName(repoUrl);
     const localPath = path.join(config.clonePath!, repoName);
-    
+
     if (fs.existsSync(localPath)) {
-      console.log(`[perf] Repository already exists at ${localPath}. Skipping clone.`);
+      console.log(`[perf] Repository already exists at ${localPath}. Skipping download.`);
       return localPath;
     }
-    
+
+    const { owner, repo } = parseGitHubRepoUrl(repoUrl);
+    const headers = this.githubHeaders();
+
     try {
-      console.time('Repository Cloning');
-      await this.git.clone(repoUrl, localPath);
-      console.log(`[perf] Cloned repository to ${localPath}`);
-      console.timeEnd('Repository Cloning');
+      console.time('Repository Download');
+      const defaultBranch = await fetchDefaultBranch(owner, repo, headers);
+      const branches = [defaultBranch, 'main', 'master'].filter(
+        (branch): branch is string => Boolean(branch)
+      );
+
+      console.log(`[repo] acquiring ${owner}/${repo} via GitHub archive (branches: ${branches.join(', ')})`);
+
+      const result = await downloadAndExtractGitHubArchive({
+        owner,
+        repo,
+        branches,
+        destinationPath: localPath,
+        headers,
+      });
+
+      console.log(`[perf] Repository archive downloaded from ${result.archiveUrl}`);
+      console.log(`[perf] Stored repository at ${localPath}`);
+      console.timeEnd('Repository Download');
       return localPath;
     } catch (error) {
-      console.error('Failed to clone repository:', error);
-      console.timeEnd('Repository Cloning');
-      throw new ApiError(500, 'Failed to clone repository');
+      console.timeEnd('Repository Download');
+      console.error('Failed to download repository archive:', error);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError(500, 'Failed to download repository');
     }
   }
 
@@ -94,29 +127,13 @@ class GitHubService {
   }
 
   private extractOwnerRepo(repoUrl: string) {
-    const cleanedUrl = repoUrl.replace(/\.git$/, '');
-    const match = cleanedUrl.match(/github\.com[:/]([^/]+)\/([^/]+)$/i);
-
-    if (!match) {
-      throw new ApiError(400, 'Invalid GitHub repository URL');
-    }
-
-    return {
-      owner: match[1],
-      repo: match[2],
-    };
+    return parseGitHubRepoUrl(repoUrl);
   }
 
   async fetchRepoMetadata(repoUrl: string): Promise<RepoMetadata | undefined> {
     try {
       const { owner, repo } = this.extractOwnerRepo(repoUrl);
-      const headers: Record<string, string> = {
-        Accept: 'application/vnd.github+json',
-      };
-
-      if (config.githubToken) {
-        headers.Authorization = `Bearer ${config.githubToken}`;
-      }
+      const headers = this.githubHeaders();
 
       const repoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
       if (!repoResponse.ok) {
@@ -153,3 +170,6 @@ class GitHubService {
 }
 
 export const githubService = new GitHubService();
+
+// Exported for tests/diagnostics
+export { buildArchiveUrl };
