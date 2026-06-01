@@ -8,11 +8,19 @@ import { vectorService } from './vector.service';
 import { ApiError } from '../lib/errors';
 
 type AnalysisStatus = 'pending' | 'processing' | 'completed' | 'failed';
+type AnalysisStatusWithCancel = AnalysisStatus | 'cancelled';
+
+class CancelledAnalysisError extends Error {
+  constructor() {
+    super('Analysis cancelled');
+    this.name = 'CancelledAnalysisError';
+  }
+}
 
 interface AnalysisRecord {
   analysisId: string;
   repoUrl: string;
-  status: AnalysisStatus;
+  status: AnalysisStatusWithCancel;
   message?: string;
   collectionName?: string;
   repoMetadata?: {
@@ -50,6 +58,16 @@ function toRelativePath(root: string, filePath: string): string {
 class AnalysisService {
   private analyses = new Map<string, AnalysisRecord>();
 
+  private isCancelled(analysisId: string): boolean {
+    return this.analyses.get(analysisId)?.status === 'cancelled';
+  }
+
+  private throwIfCancelled(analysisId: string) {
+    if (this.isCancelled(analysisId)) {
+      throw new CancelledAnalysisError();
+    }
+  }
+
   async startAnalysis(repoUrl: string): Promise<string> {
     const analysisId = randomUUID();
     this.analyses.set(analysisId, {
@@ -74,7 +92,17 @@ class AnalysisService {
     });
 
     try {
-      const result = await this.analyzeRepo(repoUrl);
+      const result = await this.analyzeRepo(analysisId, repoUrl);
+      if (this.isCancelled(analysisId)) {
+        this.analyses.set(analysisId, {
+          analysisId,
+          repoUrl,
+          status: 'cancelled',
+          message: 'Analysis cancelled',
+        });
+        return;
+      }
+
       this.analyses.set(analysisId, {
         analysisId,
         repoUrl,
@@ -82,6 +110,16 @@ class AnalysisService {
         ...result,
       });
     } catch (error) {
+      if (error instanceof CancelledAnalysisError || this.isCancelled(analysisId)) {
+        this.analyses.set(analysisId, {
+          analysisId,
+          repoUrl,
+          status: 'cancelled',
+          message: 'Analysis cancelled',
+        });
+        return;
+      }
+
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.analyses.set(analysisId, {
         analysisId,
@@ -92,24 +130,63 @@ class AnalysisService {
     }
   }
 
-  async analyzeRepo(repoUrl: string) {
+  cancelAnalysis(analysisId: string): AnalysisRecord | undefined {
+    const analysis = this.analyses.get(analysisId);
+    if (!analysis) {
+      return undefined;
+    }
+
+    if (analysis.status === 'completed' || analysis.status === 'failed') {
+      return analysis;
+    }
+
+    const cancelledAnalysis = {
+      ...analysis,
+      status: 'cancelled' as const,
+      message: 'Analysis cancelled',
+    };
+
+    this.analyses.set(analysisId, cancelledAnalysis);
+    return cancelledAnalysis;
+  }
+
+  async analyzeRepo(analysisId: string, repoUrl: string) {
     try {
+      this.throwIfCancelled(analysisId);
+
       const localPath = await githubService.cloneRepo(repoUrl);
-      const files = await githubService.scanFiles(localPath);
+      this.throwIfCancelled(analysisId);
+
+      const files = await githubService.scanFiles(localPath, () => this.isCancelled(analysisId));
+      this.throwIfCancelled(analysisId);
+
       const relativeFiles = files.map((filePath) => toRelativePath(localPath, filePath));
+      this.throwIfCancelled(analysisId);
+
       const repoMetadata = await githubService.fetchRepoMetadata(repoUrl);
+      this.throwIfCancelled(analysisId);
+
       const packageJson = readPackageJson(localPath);
       const collectionName = repoUrl.replace(/[^a-zA-Z0-9]/g, '_');
 
       const parsedData = [];
       for (const file of files) {
+        this.throwIfCancelled(analysisId);
+
         const data = await parserService.parseFile(file);
         if (data) {
           parsedData.push(data);
         }
       }
 
-      const embeddings = await embeddingService.generateEmbeddingsForFiles(files);
+      this.throwIfCancelled(analysisId);
+
+      const embeddings = await embeddingService.generateEmbeddingsForFiles(files, () => this.isCancelled(analysisId));
+      this.throwIfCancelled(analysisId);
+
+      if (embeddings.length === 0 && this.isCancelled(analysisId)) {
+        throw new CancelledAnalysisError();
+      }
 
       const documents = embeddings.map((emb, index) => ({
         id: `${emb.filePath}-${index}`,
@@ -136,6 +213,10 @@ class AnalysisService {
         parsedData,
       };
     } catch (error) {
+      if (error instanceof CancelledAnalysisError || this.isCancelled(analysisId)) {
+        throw new CancelledAnalysisError();
+      }
+
       console.error('Repository analysis failed:', error);
       if (error instanceof ApiError) {
         throw error;

@@ -203,6 +203,18 @@ export default function DashboardPage() {
     return <DashboardLayout><PageShell>Analysis data is incomplete.</PageShell></DashboardLayout>;
   }
 
+  if (data.status === 'cancelled') {
+    return (
+      <DashboardLayout>
+        <PageShell>
+          <div className="absolute top-[40%] left-[50%] mx-auto w-full translate-[-35%] flex max-w-2xl flex-col items-center gap-4 py-16 text-center">
+            <div className="text-sm text-muted-foreground">Analysis was cancelled.</div>
+          </div>
+        </PageShell>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <PageShell>

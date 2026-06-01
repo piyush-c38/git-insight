@@ -47,11 +47,19 @@ class GitHubService {
     }
   }
 
-  async scanFiles(localPath: string): Promise<string[]> {
+  async scanFiles(localPath: string, shouldStop?: () => boolean): Promise<string[]> {
     const allFiles: string[] = [];
     const walk = (dir: string) => {
+      if (shouldStop?.()) {
+        return;
+      }
+
       const files = fs.readdirSync(dir);
       for (const file of files) {
+        if (shouldStop?.()) {
+          return;
+        }
+
         const filePath = path.join(dir, file);
         const stat = fs.statSync(filePath);
         if (stat.isDirectory()) {

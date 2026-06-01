@@ -12,8 +12,8 @@ router.post(
     if (!url) {
       throw new ApiError(400, 'Repository URL is required');
     }
-    const result = await analysisService.analyzeRepo(url);
-    res.json(result);
+    const analysisId = await analysisService.startAnalysis(url);
+    res.status(202).json({ analysisId, status: 'pending' });
   })
 );
 

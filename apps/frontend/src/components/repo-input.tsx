@@ -20,7 +20,7 @@ export default function RepoInput({ className, autoFocus }: Props) {
   const progressTimerRef = useRef<number | null>(null);
   const pollTimerRef = useRef<number | null>(null);
 
-  const stopAnalysis = () => {
+  const clearTimers = () => {
     if (progressTimerRef.current) {
       window.clearInterval(progressTimerRef.current);
       progressTimerRef.current = null;
@@ -29,6 +29,20 @@ export default function RepoInput({ className, autoFocus }: Props) {
     if (pollTimerRef.current) {
       window.clearInterval(pollTimerRef.current);
       pollTimerRef.current = null;
+    }
+  };
+
+  const stopAnalysis = async () => {
+    const activeAnalysisId = analysisId;
+    clearTimers();
+
+    if (activeAnalysisId) {
+      void fetch(`/api/analysis/${activeAnalysisId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }).catch(() => {
+        // Best-effort cancellation; local polling has already stopped.
+      });
     }
 
     setUrl('');
@@ -64,15 +78,7 @@ export default function RepoInput({ className, autoFocus }: Props) {
         if (cancelled) return;
 
         if (data.status === 'completed') {
-          if (progressTimerRef.current) {
-            window.clearInterval(progressTimerRef.current);
-            progressTimerRef.current = null;
-          }
-
-          if (pollTimerRef.current) {
-            window.clearInterval(pollTimerRef.current);
-            pollTimerRef.current = null;
-          }
+          clearTimers();
 
           setProgress(100);
           setLoading(false);
@@ -80,18 +86,10 @@ export default function RepoInput({ className, autoFocus }: Props) {
           return;
         }
 
-        if (data.status === 'failed') {
-          if (progressTimerRef.current) {
-            window.clearInterval(progressTimerRef.current);
-            progressTimerRef.current = null;
-          }
+        if (data.status === 'failed' || data.status === 'cancelled') {
+          clearTimers();
 
-          if (pollTimerRef.current) {
-            window.clearInterval(pollTimerRef.current);
-            pollTimerRef.current = null;
-          }
-
-          setError('Analysis failed. Please try again.');
+          setError(data.status === 'cancelled' ? 'Analysis was cancelled.' : 'Analysis failed. Please try again.');
           setLoading(false);
           setAnalysisId(null);
           setTargetRepoPath(null);
@@ -159,7 +157,7 @@ export default function RepoInput({ className, autoFocus }: Props) {
 
   const handlePrimaryAction = () => {
     if (loading) {
-      stopAnalysis();
+      void stopAnalysis();
       return;
     }
 

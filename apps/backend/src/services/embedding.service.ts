@@ -23,9 +23,16 @@ class EmbeddingService {
     return Array.from(result.data);
   }
 
-  async generateEmbeddingsForFiles(filePaths: string[]): Promise<{ filePath: string; content: string; embedding: number[] }[]> {
+  async generateEmbeddingsForFiles(
+    filePaths: string[],
+    shouldStop?: () => boolean
+  ): Promise<{ filePath: string; content: string; embedding: number[] }[]> {
     const embeddings = [];
     for (const filePath of filePaths) {
+      if (shouldStop?.()) {
+        break;
+      }
+
       const rawContent = fs.readFileSync(filePath, 'utf-8');
       if (rawContent.includes('\u0000')) {
         continue;
@@ -34,6 +41,10 @@ class EmbeddingService {
       // Simple chunking for now
       const chunks = this.chunkText(content);
       for (const chunk of chunks) {
+        if (shouldStop?.()) {
+          break;
+        }
+
         const embedding = await this.generateEmbeddings(chunk);
         embeddings.push({ filePath, content: chunk, embedding });
       }
