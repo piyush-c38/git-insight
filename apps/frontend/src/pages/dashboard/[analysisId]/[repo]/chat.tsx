@@ -78,7 +78,7 @@ function buildSampleQuestions(data?: AnalysisData): string[] {
   const firstFile = data?.files?.[0]?.split('/').pop();
 
   const questions = [
-    `Explain the architecture of ${repoName}.`,
+    `Explain this repository.`,
     firstTech ? `What is the tech stack of ${repoName}?` : 'What technologies is this project built with?',
     topDependency
       ? `What dependencies are used and why is ${topDependency} included?`
@@ -199,7 +199,7 @@ export default function ChatPage() {
               <input
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                placeholder="Ask about architecture, files, flows..."
+                placeholder="Ask about files, flows, explanation..."
                 className="flex-1 rounded-xl bg-secondary px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
                 disabled={!analysisIdParam}
               />
