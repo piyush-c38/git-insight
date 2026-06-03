@@ -46,14 +46,14 @@ export default function Home() {
           <RepoInput autoFocus />
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
+        {/* <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
           <span>Try:</span>
           {['vercel/next.js', 'shadcn-ui/ui', 'facebook/react'].map((repo) => (
             <span key={repo} className="rounded-full border border-border bg-card px-2.5 py-1">
               {repo}
             </span>
           ))}
-        </div>
+        </div> */}
       </div>
 
       <section className="mx-auto max-w-7xl px-5 pb-2 md:px-8">
