@@ -257,7 +257,7 @@ export default function DashboardPage() {
           <div className="rounded-2xl border border-border bg-card p-6 lg:col-span-2">
             <div className="mb-4 flex items-center gap-2">
               <span className="text-sm font-semibold">First entry file and important files</span>
-              {summaryLoading && <span className="text-xs text-muted-foreground">Analyzing with AI...</span>}
+              {summaryLoading && <span className="text-xs text-primary text-muted-foreground">Analyzing with AI...</span>}
             </div>
             {summaryError && <p className="mb-3 text-xs text-muted-foreground">{summaryError}</p>}
             <ol className="space-y-3">
@@ -280,7 +280,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-6">
-            <h2 className="mb-4 font-semibold">Tech stack</h2>
+            <h2 className="mb-4 font-semibold">Technologies & Tech stack</h2>
             <div className="flex flex-wrap gap-2">
               {techStack.length === 0 ? (
                 <span className="text-sm text-muted-foreground">No tech stack metadata found on GitHub.</span>
